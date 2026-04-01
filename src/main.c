@@ -9,6 +9,8 @@
 #include "game/data.h"
 #include "screens/title.h"
 #include "screens/main_menu.h"
+#include "screens/squad.h"
+#include "screens/finances.h"
 
 int main(int hardReset) {
     (void)hardReset;
@@ -20,35 +22,41 @@ int main(int hardReset) {
     rng_init(GET_VCOUNTER);
     data_init();
 
-    /* Seleccao de equipa */
     g_player_team_idx = screen_title();
-    /* Update game state for chosen team */
     g_division = g_teams[g_player_team_idx].division;
     g_money    = g_teams[g_player_team_idx].money;
     g_round    = 1u;
 
-    /* Loop principal do jogo */
     for (;;) {
         u8 choice = screen_main_menu();
 
         switch (choice) {
             case MENU_RESULT_SQUAD:
-                /* TODO: screen_squad() */
+                screen_squad();
                 break;
             case MENU_RESULT_FINANCES:
-                /* TODO: screen_finances() */
+                screen_finances();
                 break;
             case MENU_RESULT_PLAY:
                 /* TODO: simulate_round() */
+                ui_clear();
+                ui_puts(10u, 13u, UI_PAL_NORMAL, "Simulacao em breve...");
+                { u16 t = 0u; while (t < 180u) { ui_wait_vblank(); input_update(); t++; if (input_pressed(BTN_CANCEL)) break; } }
                 break;
             case MENU_RESULT_TRANSFERS:
-                /* TODO: screen_transfers() */
+                ui_clear();
+                ui_puts(10u, 13u, UI_PAL_NORMAL, "Transferencias em breve...");
+                { u16 t = 0u; while (t < 180u) { ui_wait_vblank(); input_update(); t++; if (input_pressed(BTN_CANCEL)) break; } }
                 break;
             case MENU_RESULT_COACHES:
-                /* TODO: screen_coaches() */
+                ui_clear();
+                ui_puts(10u, 13u, UI_PAL_NORMAL, "Treinadores em breve...");
+                { u16 t = 0u; while (t < 180u) { ui_wait_vblank(); input_update(); t++; if (input_pressed(BTN_CANCEL)) break; } }
                 break;
             case MENU_RESULT_SAVE:
-                /* TODO: sram_save() */
+                ui_clear();
+                ui_puts(10u, 13u, UI_PAL_NORMAL, "Guardar em breve...");
+                { u16 t = 0u; while (t < 180u) { ui_wait_vblank(); input_update(); t++; if (input_pressed(BTN_CANCEL)) break; } }
                 break;
             default:
                 break;
