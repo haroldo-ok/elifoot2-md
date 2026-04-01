@@ -12,18 +12,8 @@
 #include "screens/squad.h"
 #include "screens/finances.h"
 #include "screens/play_round.h"
-
-static void brief_msg(const char *msg) {
-    u16 t;
-    ui_clear();
-    ui_puts(8u, 13u, UI_PAL_NORMAL, msg);
-    ui_puts(8u, 15u, UI_PAL_NORMAL, "B: voltar");
-    for (t = 0u; t < 300u; t++) {
-        ui_wait_vblank();
-        input_update();
-        if (input_pressed(BTN_CANCEL) || input_pressed(BTN_START)) break;
-    }
-}
+#include "screens/transfers.h"
+#include "screens/save_load.h"
 
 int main(int hardReset) {
     (void)hardReset;
@@ -43,12 +33,15 @@ int main(int hardReset) {
     for (;;) {
         u8 choice = screen_main_menu();
         switch (choice) {
-            case MENU_RESULT_SQUAD:      screen_squad();             break;
-            case MENU_RESULT_FINANCES:   screen_finances();          break;
-            case MENU_RESULT_PLAY:       screen_play_round();        break;
-            case MENU_RESULT_TRANSFERS:  brief_msg("Transferencias em breve..."); break;
-            case MENU_RESULT_COACHES:    brief_msg("Treinadores em breve...");    break;
-            case MENU_RESULT_SAVE:       brief_msg("Guardar em breve...");        break;
+            case MENU_RESULT_SQUAD:     screen_squad();      break;
+            case MENU_RESULT_FINANCES:  screen_finances();   break;
+            case MENU_RESULT_PLAY:      screen_play_round(); break;
+            case MENU_RESULT_TRANSFERS: screen_transfers();  break;
+            case MENU_RESULT_COACHES:
+                /* TODO: screen_coaches() */
+                { ui_clear(); ui_puts(8u,13u,UI_PAL_NORMAL,"Treinadores em breve..."); ui_puts(8u,15u,UI_PAL_NORMAL,"B: voltar"); { u16 t=0u; while(t<300u){ui_wait_vblank();input_update();t++;if(input_pressed(BTN_CANCEL))break;} } }
+                break;
+            case MENU_RESULT_SAVE:      screen_save_load();  break;
             default: break;
         }
     }

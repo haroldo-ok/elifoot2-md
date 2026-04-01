@@ -1,190 +1,157 @@
 /*
- * screens/transfers.c -- Venda e leil?o de jogadores
+ * screens/transfers.c -- Mercado de transferencias
  *
- * Layout fiel ao original:
- *
- *   VENDA PELA MELHOR OFERTA DE ORDENADO
- *   ?????????????????????????????????????????
- *    JOGADOR        | POS | FRC | EQUIPA     | PRECO
- *   ?????????????????????????????????????????????????
- *    Zetti          |  GR |  85 | SAO PAULO  |  Venda
- *    Rogerio        |  GR |  72 | SAO PAULO  |  ...
- *
- *   ORDENADO MINIMO: 8500
- *   [A] Vender  [B] Voltar
- *
- * Ap?s venda:
- *   TRANSFERIDO PARA O CORINTHIANS
- *   NOVO ORDENADO: 9200
- *
- * Ou:
- *   NAO HOUVE OFERTAS
+ * Permite ao jogador ver o plantel, colocar jogadores em leilao
+ * e comprar jogadores de outros clubes via transfer_auction().
  */
 
 #include <genesis.h>
 #include "transfers.h"
-#include "../game/data.h"
-#include "../game/economy.h"
-#include "../game/transfer.h"
-#include "../game/types.h"
+#include "../engine/ui.h"
 #include "../engine/input.h"
-#include "../engine/render.h"
+#include "../game/data.h"
+#include "../game/transfer.h"
 
-static const char * const s_pos_abbr[4] = { "GR", "DF", "MD", "AV" };
+static const char s_pos[4][3] = { "GR", "DF", "MD", "AV" };
 
-/* ------------------------------------------------------------------ */
-/* Render da lista de jogadores                                        */
-/* ------------------------------------------------------------------ */
+/* Subecra: lista de jogadores compraveis de outras equipas */
+static void buy_screen(void) {
+    /* Lista ate 16 jogadores de equipas rivais com menor forca */
+    u8 candidates[16];
+    u8 n = 0u;
+    u8 t, i;
 
-static void render_transfers(u8 team_idx, ListNav *nav) {
-    Team  *team = &g_teams[team_idx];
-    u16    row  = (u16)CONTENT_ROW_FIRST;
-    u8     i;
-
-    render_clear_content();
-
-    render_text(BG_A, "VENDA PELA MELHOR OFERTA DE ORDENADO",
-                1u, row++, PAL_MAIN);
-    render_hline(BG_A, 1u, row++, 38u, BOX_SIMPLE, PAL_MAIN);
-    render_text(BG_A, " Nome            Pos Frc  Ord.Min  Actual",
-                1u, row++, PAL_MAIN);
-    render_hline(BG_A, 1u, row++, 38u, BOX_SIMPLE, PAL_MAIN);
-
-    {
-        u8 end = (u8)(nav->page_top + nav->page_size);
-        if (end > team->player_count) end = team->player_count;
-
-        for (i = nav->page_top; i < end; i++) {
-            Player *pl  = &g_players[(u16)team->player_start + i];
-            long    min = economy_min_salary(pl->strength);
-            u16     pal = (i == nav->selected) ? PAL_SELECTED : PAL_MAIN;
-
-            if (pal == PAL_SELECTED)
-                render_fill_rect(BG_A, 1u, row, 38u, 1u, PAL_SELECTED, 0u);
-            render_textf(BG_A, 1u, row, pal,
-                         " %-14s %s %3u %8ld %7ld",
-                         pl->name, s_pos_abbr[pl->pos],
-                         (u16)pl->strength, min, pl->salary);
-            row++;
+    /* Recolher jogadores vendaveis (forca < 70, nao da equipa do jogador) */
+    for (t = 0u; t < (u8)TEAM_COUNT && n < 16u; t++) {
+        if (t == g_player_team_idx) continue;
+        for (i = 0u; i < g_teams[t].player_count && n < 16u; i++) {
+            u16 pidx = (u16)(g_teams[t].player_start + i);
+            if (g_players[pidx].strength < 70u) {
+                candidates[n++] = (u8)pidx;
+            }
         }
-
-        if (nav->page_top > 0u)
-            render_text(BG_A, "^", 39u, (u16)(CONTENT_ROW_FIRST + 4u), PAL_MAIN);
-        if (end < team->player_count)
-            render_text(BG_A, "v", 39u, (u16)(row - 1u), PAL_MAIN);
     }
 
-    /* Ordenado m?nimo do jogador seleccionado                        */
     {
-        Player *sel_pl = &g_players[(u16)team->player_start + nav->selected];
-        render_hline(BG_A, 1u, (u16)(CONTENT_ROW_LAST - 2u),
-                     38u, BOX_SIMPLE, PAL_MAIN);
-        render_textf(BG_A, 1u, (u16)(CONTENT_ROW_LAST - 1u), PAL_MAIN,
-                     "ORDENADO MINIMO: %ld  Equipa: %-12s",
-                     economy_min_salary(sel_pl->strength),
-                     team->name);
-    }
+        u8  sel = 0u;
+        u8  redraw = 1u;
 
-    render_help_bar("[A] Vender  [^v] Navegar  [B] Voltar", NULL);
+        for (;;) {
+            ui_wait_vblank();
+            input_update();
+
+            if (input_pressed(BTN_CANCEL) || input_pressed(BTN_START)) return;
+
+            if (input_repeat(BTN_DOWN) && sel < (u8)(n - 1u)) { sel++; redraw = 1u; }
+            if (input_repeat(BTN_UP)   && sel > 0u)            { sel--; redraw = 1u; }
+
+            if (input_pressed(BTN_CONFIRM) && n > 0u) {
+                u16 pidx = candidates[sel];
+                u8  result = transfer_auction(pidx,
+                    g_players[pidx].nat); /* usando nat como team proxy */
+                ui_clear();
+                if (result) {
+                    ui_puts(6u, 13u, UI_PAL_NORMAL, "Transferencia concluida!");
+                } else {
+                    ui_puts(6u, 13u, UI_PAL_NORMAL, "Transferencia falhada.");
+                }
+                ui_puts(6u, 15u, UI_PAL_NORMAL, "B: continuar");
+                { u16 x; for (x=0u; x<120u; x++) { ui_wait_vblank(); input_update(); if(input_pressed(BTN_CANCEL)) break; } }
+                return;
+            }
+
+            if (!redraw) continue;
+            redraw = 0u;
+
+            ui_clear();
+            ui_puts(10u, 0u, UI_PAL_NORMAL, "COMPRAR JOGADOR");
+            ui_hline(0u, 1u, UI_COLS, UI_PAL_NORMAL);
+            ui_puts(0u, 2u, UI_PAL_NORMAL, "#  Nome            Pos For Sal");
+            ui_hline(0u, 3u, UI_COLS, UI_PAL_NORMAL);
+
+            {
+                u8 j;
+                for (j = 0u; j < n; j++) {
+                    u16 pidx = candidates[j];
+                    Player *pl = &g_players[pidx];
+                    u16 row = (u16)(4u + j);
+                    u16 pal = (j == sel) ? UI_PAL_SELECT : UI_PAL_NORMAL;
+                    if (j == sel) ui_fill_row(row, UI_PAL_SELECT);
+                    ui_printf(0u, row, pal, "%2u %-15s %2s %3u %6ld",
+                              (u16)(j + 1u), pl->name,
+                              s_pos[pl->pos < 4u ? pl->pos : 0u],
+                              (u16)pl->strength, pl->salary);
+                }
+            }
+
+            ui_hline(0u, 26u, UI_COLS, UI_PAL_NORMAL);
+            ui_puts(0u, 27u, UI_PAL_NORMAL, "A:comprar  B:voltar");
+        }
+    }
 }
 
-/* ------------------------------------------------------------------ */
-/* screen_transfers()                                                  */
-/* ------------------------------------------------------------------ */
-
 void screen_transfers(void) {
-    Team   *team = &g_teams[g_player_team_idx];
-    ListNav nav;
-    u8      needs_redraw = 1u;
-    u8      page_size    = (u8)(CONTENT_ROW_LAST - CONTENT_ROW_FIRST - 6u);
-
-    list_nav_init(&nav, team->player_count, page_size);
+    Team   *team  = &g_teams[g_player_team_idx];
+    u8      sel   = 0u;
+    u8      total = team->player_count;
+    u8      redraw = 1u;
 
     for (;;) {
-        SYS_doVBlankProcess();
+        ui_wait_vblank();
         input_update();
 
-        if (input_pressed(BTN_CANCEL)) return;
+        if (input_pressed(BTN_CANCEL) || input_pressed(BTN_START)) return;
 
-        if (list_nav_update(&nav)) needs_redraw = 1u;
+        if (input_repeat(BTN_DOWN) && sel < (u8)(total - 1u)) { sel++; redraw = 1u; }
+        if (input_repeat(BTN_UP)   && sel > 0u)               { sel--; redraw = 1u; }
 
-        /* Vender jogador seleccionado                                */
-        if (input_pressed(BTN_CONFIRM)) {
-            u16  pi      = (u16)team->player_start + nav.selected;
-            u8   winner;
-            u8   total   = data_get_team_player_count(g_player_team_idx);
-            u8   gk_cnt  = data_get_team_gk_count(g_player_team_idx);
-            Player *pl   = &g_players[pi];
-
-            /* Verifica restri??es de plantel                         */
-            if (total <= (u8)MIN_SQUAD_SIZE) {
-                render_text(BG_A,
-                    "Como so possui 14 jogadores na equipa.",
-                    1u, (u16)(CONTENT_ROW_LAST - 1u), PAL_MAIN);
-                {
-                    u8 t;
-                    for (t = 0u; t < 120u; t++) SYS_doVBlankProcess();
-                }
-                needs_redraw = 1u;
-                continue;
-            }
-            if (pl->pos == (u8)POS_GR && gk_cnt <= (u8)MIN_GK_COUNT) {
-                render_text(BG_A,
-                    "Como so possui um guarda-redes na equipa.",
-                    1u, (u16)(CONTENT_ROW_LAST - 1u), PAL_MAIN);
-                {
-                    u8 t;
-                    for (t = 0u; t < 120u; t++) SYS_doVBlankProcess();
-                }
-                needs_redraw = 1u;
-                continue;
-            }
-
-            /* Lan?a leil?o                                            */
-            winner = transfer_auction(pi, g_player_team_idx);
-
-            /* Exibe resultado -- fiel ao original                     */
-            render_clear_content();
-            render_text(BG_A, "VENDA PELA MELHOR OFERTA DE ORDENADO",
-                        1u, (u16)CONTENT_ROW_FIRST, PAL_MAIN);
-            render_hline(BG_A, 1u, (u16)(CONTENT_ROW_FIRST + 1u),
-                         38u, BOX_SIMPLE, PAL_MAIN);
-
-            if (winner != 0xFFu) {
-                render_textf(BG_A, 2u, (u16)(CONTENT_ROW_FIRST + 3u),
-                             PAL_MAIN,
-                             "TRANSFERIDO PARA O %s",
-                             g_teams[winner].name);
-                /* O novo ordenado ? o sal?rio ap?s a transfer?ncia   */
-                render_textf(BG_A, 2u, (u16)(CONTENT_ROW_FIRST + 4u),
-                             PAL_MAIN,
-                             "NOVO ORDENADO: %ld esc.",
-                             g_players[pi].salary);
-                /* Sincroniza dinheiro                                */
-                g_money = team->money;
-                /* O array foi compactado -- ajusta nav                */
-                if (nav.selected >= team->player_count && nav.selected > 0u)
-                    nav.selected--;
-                nav.count = team->player_count;
-            } else {
-                render_text(BG_A, "NAO HOUVE OFERTAS",
-                            2u, (u16)(CONTENT_ROW_FIRST + 3u), PAL_MAIN);
-            }
-
-            render_help_bar("[A/B] Continuar", NULL);
-            for (;;) {
-                SYS_doVBlankProcess();
-                input_update();
-                if (input_pressed(BTN_CONFIRM) || input_pressed(BTN_CANCEL))
-                    break;
-            }
-            nav.count = team->player_count;
-            needs_redraw = 1u;
+        /* C = ver mercado de compras */
+        if (input_pressed(BTN_ACTION)) {
+            buy_screen();
+            redraw = 1u;
+            team = &g_teams[g_player_team_idx];
+            total = team->player_count;
         }
 
-        if (!needs_redraw) continue;
-        needs_redraw = 0u;
-        nav.count = team->player_count;
-        render_transfers(g_player_team_idx, &nav);
+        /* A = vender jogador seleccionado */
+        if (input_pressed(BTN_CONFIRM)) {
+            u16 pidx = (u16)(team->player_start + sel);
+            u8  result = transfer_auction(pidx, g_player_team_idx);
+            ui_clear();
+            ui_puts(6u, 13u, UI_PAL_NORMAL,
+                    result ? "Jogador vendido!" : "Venda nao concluida.");
+            ui_puts(6u, 15u, UI_PAL_NORMAL, "B: continuar");
+            { u16 x; for(x=0u;x<120u;x++){ ui_wait_vblank(); input_update(); if(input_pressed(BTN_CANCEL)) break; } }
+            redraw = 1u;
+        }
+
+        if (!redraw) continue;
+        redraw = 0u;
+
+        ui_clear();
+        ui_puts(0u, 0u, UI_PAL_NORMAL, team->name);
+        ui_puts(24u, 0u, UI_PAL_NORMAL, "TRANSFERENCIAS");
+        ui_hline(0u, 1u, UI_COLS, UI_PAL_NORMAL);
+        ui_printf(0u, 2u, UI_PAL_NORMAL, "Dinheiro: %ld Esc", g_money);
+        ui_puts(0u, 3u, UI_PAL_NORMAL, "#  Nome            Pos For Sal");
+        ui_hline(0u, 4u, UI_COLS, UI_PAL_NORMAL);
+
+        {
+            u8 i;
+            for (i = 0u; i < total && i < 20u; i++) {
+                u16 pidx = (u16)(team->player_start + i);
+                Player *pl = &g_players[pidx];
+                u16 row = (u16)(5u + i);
+                u16 pal = (i == sel) ? UI_PAL_SELECT : UI_PAL_NORMAL;
+                if (i == sel) ui_fill_row(row, UI_PAL_SELECT);
+                ui_printf(0u, row, pal, "%2u %-15s %2s %3u %6ld",
+                          (u16)(i + 1u), pl->name,
+                          s_pos[pl->pos < 4u ? pl->pos : 0u],
+                          (u16)pl->strength, pl->salary);
+            }
+        }
+
+        ui_hline(0u, 26u, UI_COLS, UI_PAL_NORMAL);
+        ui_puts(0u, 27u, UI_PAL_NORMAL, "A:vender  C:comprar  B:voltar");
     }
 }
