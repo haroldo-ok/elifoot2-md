@@ -7,6 +7,7 @@
 
 #include <genesis.h>
 /* stdarg via GCC builtins -- SGDK does not ship stdarg.h */
+int vsprintf(char *buf, const char *fmt, __builtin_va_list ap);
 #ifndef va_list
 typedef __builtin_va_list va_list;
 #define va_start(v,l)  __builtin_va_start(v,l)
@@ -89,9 +90,10 @@ void render_box(VDPPlane plane, u16 x, u16 y, u16 w, u16 h,
 
 void render_status_bar(void) { /* no-op -- handled in ui layer */ }
 
-void render_help_bar(const char *msg) {
+void render_help_bar(const char *line1, const char *line2) {
     ui_hline(0u, 25u, UI_COLS, UI_PAL_NORMAL);
-    if (msg) ui_puts(0u, 26u, UI_PAL_NORMAL, msg);
+    if (line1) ui_puts(0u, 26u, UI_PAL_NORMAL, line1);
+    if (line2) ui_puts(0u, 27u, UI_PAL_NORMAL, line2);
 }
 
 void render_text_pad(VDPPlane plane, const char *str,
