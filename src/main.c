@@ -11,6 +11,19 @@
 #include "screens/main_menu.h"
 #include "screens/squad.h"
 #include "screens/finances.h"
+#include "screens/play_round.h"
+
+static void brief_msg(const char *msg) {
+    u16 t;
+    ui_clear();
+    ui_puts(8u, 13u, UI_PAL_NORMAL, msg);
+    ui_puts(8u, 15u, UI_PAL_NORMAL, "B: voltar");
+    for (t = 0u; t < 300u; t++) {
+        ui_wait_vblank();
+        input_update();
+        if (input_pressed(BTN_CANCEL) || input_pressed(BTN_START)) break;
+    }
+}
 
 int main(int hardReset) {
     (void)hardReset;
@@ -29,37 +42,14 @@ int main(int hardReset) {
 
     for (;;) {
         u8 choice = screen_main_menu();
-
         switch (choice) {
-            case MENU_RESULT_SQUAD:
-                screen_squad();
-                break;
-            case MENU_RESULT_FINANCES:
-                screen_finances();
-                break;
-            case MENU_RESULT_PLAY:
-                /* TODO: simulate_round() */
-                ui_clear();
-                ui_puts(10u, 13u, UI_PAL_NORMAL, "Simulacao em breve...");
-                { u16 t = 0u; while (t < 180u) { ui_wait_vblank(); input_update(); t++; if (input_pressed(BTN_CANCEL)) break; } }
-                break;
-            case MENU_RESULT_TRANSFERS:
-                ui_clear();
-                ui_puts(10u, 13u, UI_PAL_NORMAL, "Transferencias em breve...");
-                { u16 t = 0u; while (t < 180u) { ui_wait_vblank(); input_update(); t++; if (input_pressed(BTN_CANCEL)) break; } }
-                break;
-            case MENU_RESULT_COACHES:
-                ui_clear();
-                ui_puts(10u, 13u, UI_PAL_NORMAL, "Treinadores em breve...");
-                { u16 t = 0u; while (t < 180u) { ui_wait_vblank(); input_update(); t++; if (input_pressed(BTN_CANCEL)) break; } }
-                break;
-            case MENU_RESULT_SAVE:
-                ui_clear();
-                ui_puts(10u, 13u, UI_PAL_NORMAL, "Guardar em breve...");
-                { u16 t = 0u; while (t < 180u) { ui_wait_vblank(); input_update(); t++; if (input_pressed(BTN_CANCEL)) break; } }
-                break;
-            default:
-                break;
+            case MENU_RESULT_SQUAD:      screen_squad();             break;
+            case MENU_RESULT_FINANCES:   screen_finances();          break;
+            case MENU_RESULT_PLAY:       screen_play_round();        break;
+            case MENU_RESULT_TRANSFERS:  brief_msg("Transferencias em breve..."); break;
+            case MENU_RESULT_COACHES:    brief_msg("Treinadores em breve...");    break;
+            case MENU_RESULT_SAVE:       brief_msg("Guardar em breve...");        break;
+            default: break;
         }
     }
 
