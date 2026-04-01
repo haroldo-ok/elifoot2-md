@@ -134,9 +134,12 @@ void render_init(void) {
     VDP_clearTileMapRect(BG_B, 0, 0, 40, 28);
     VDP_clearTileMapRect(WINDOW, 0, 0, 40, 28);
 
-    /* Configura BG_B como fundo s?lido preto (tile 0, PAL0[0]=preto). */
-    /* render_set_bg_color(0) far? isso explicitamente quando chamado, */
-    /* mas garantimos estado limpo aqui.                               */
+    /* Push WINDOW off-screen -- by default SGDK sets WINDOW to cover
+     * the full display, which overlays BG_A and hides all text drawn there.
+     * VDP_setWindowVPos(TRUE, 28) moves the WINDOW start to row 28
+     * (below visible area), making BG_A fully visible for rows 0-27.
+     * All UI text (status bar, help bar, content) goes directly on BG_A. */
+    VDP_setWindowVPos(TRUE, 28);
 }
 
 /* ------------------------------------------------------------------ */
@@ -384,40 +387,40 @@ void render_status_bar(void) {
      */
 
     /* Linha 0: borda dupla superior (? repetida)                      */
-    render_fill_rect(WINDOW, 0u, 0u, SCREEN_COLS, 1u, PAL_SELECTED, 0u);
-    render_hline(WINDOW, 0u, 0u, SCREEN_COLS, BOX_DOUBLE, PAL_SELECTED);
+    render_fill_rect(BG_A, 0u, 0u, SCREEN_COLS, 1u, PAL_SELECTED, 0u);
+    render_hline(BG_A, 0u, 0u, SCREEN_COLS, BOX_DOUBLE, PAL_SELECTED);
 
     /* Linha 1: conte?do da status bar                                 */
-    render_fill_rect(WINDOW, 0u, STATUS_ROW, SCREEN_COLS, 1u,
+    render_fill_rect(BG_A, 0u, STATUS_ROW, SCREEN_COLS, 1u,
                      PAL_SELECTED, 0u);
 
     /* Texto principal da status bar (preto sobre ciano -- PAL1[1])    */
-    render_text(WINDOW, "ELIFOOT II", 1u, STATUS_ROW, PAL_SELECTED);
+    render_text(BG_A, "ELIFOOT II", 1u, STATUS_ROW, PAL_SELECTED);
 
     /* Jornada: amarelo sobre ciano (PAL1[3])                          */
-    render_textf(WINDOW, 14u, STATUS_ROW, PAL_SELECTED,
+    render_textf(BG_A, 14u, STATUS_ROW, PAL_SELECTED,
                  "Jornada:%02u", (u16)g_round);
 
     /* Divis?o                                                          */
-    render_textf(WINDOW, 25u, STATUS_ROW, PAL_SELECTED,
+    render_textf(BG_A, 25u, STATUS_ROW, PAL_SELECTED,
                  "Div%u", (u16)(g_division + 1u));
 
     /* Dinheiro: amarelo sobre ciano -- usamos PAL1 aqui porque o texto
      * j? aparece sobre o fundo ciano e PAL1[3]=amarelo d? destaque.  */
-    render_textf(WINDOW, 30u, STATUS_ROW, PAL_SELECTED,
+    render_textf(BG_A, 30u, STATUS_ROW, PAL_SELECTED,
                  "$%ld", g_money);
 
     /* Linha 2: borda separadora (?)                                   */
-    render_fill_rect(WINDOW, 0u, 2u, SCREEN_COLS, 1u, PAL_SELECTED, 0u);
-    render_hline(WINDOW, 0u, 2u, SCREEN_COLS, BOX_DOUBLE, PAL_SELECTED);
+    render_fill_rect(BG_A, 0u, 2u, SCREEN_COLS, 1u, PAL_SELECTED, 0u);
+    render_hline(BG_A, 0u, 2u, SCREEN_COLS, BOX_DOUBLE, PAL_SELECTED);
 
     /* Linha 25: borda separadora antes do help bar                    */
-    render_fill_rect(WINDOW, 0u, 25u, SCREEN_COLS, 1u, PAL_SELECTED, 0u);
-    render_hline(WINDOW, 0u, 25u, SCREEN_COLS, BOX_DOUBLE, PAL_SELECTED);
+    render_fill_rect(BG_A, 0u, 25u, SCREEN_COLS, 1u, PAL_SELECTED, 0u);
+    render_hline(BG_A, 0u, 25u, SCREEN_COLS, BOX_DOUBLE, PAL_SELECTED);
 
     /* Linha 27: borda inferior                                        */
-    render_fill_rect(WINDOW, 0u, 27u, SCREEN_COLS, 1u, PAL_SELECTED, 0u);
-    render_hline(WINDOW, 0u, 27u, SCREEN_COLS, BOX_DOUBLE, PAL_SELECTED);
+    render_fill_rect(BG_A, 0u, 27u, SCREEN_COLS, 1u, PAL_SELECTED, 0u);
+    render_hline(BG_A, 0u, 27u, SCREEN_COLS, BOX_DOUBLE, PAL_SELECTED);
 }
 
 /* ------------------------------------------------------------------ */
@@ -426,14 +429,14 @@ void render_status_bar(void) {
 
 void render_help_bar(const char *line1, const char *line2) {
     /* Linha 26: help bar com hints de controle                        */
-    render_fill_rect(WINDOW, 0u, HELP_ROW, SCREEN_COLS, 1u,
+    render_fill_rect(BG_A, 0u, HELP_ROW, SCREEN_COLS, 1u,
                      PAL_SELECTED, 0u);
     if (line1 != (const char *)0) {
-        render_text_pad(WINDOW, line1, 1u, HELP_ROW,
+        render_text_pad(BG_A, line1, 1u, HELP_ROW,
                         (u16)(SCREEN_COLS - 2u), PAL_SELECTED);
     }
     if (line2 != (const char *)0) {
-        render_fill_rect(WINDOW, 0u, 27u, SCREEN_COLS, 1u,
+        render_fill_rect(BG_A, 0u, 27u, SCREEN_COLS, 1u,
                          PAL_SELECTED, 0u);
         /* linha 27 j? ? borda -- exibimos em linha 26 apenas, linha 27
          * permanece como borda inferior desenhada por render_status_bar */

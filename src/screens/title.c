@@ -112,8 +112,11 @@ void screen_title(void) {
 
     for (;;) {
         /* ---- Input ---- */
+        KLog("screen_title: top of loop, calling SYS_doVBlankProcess");
         SYS_doVBlankProcess();
+        KLog("screen_title: SYS_doVBlankProcess done, calling input_update");
         input_update();
+        KLog("screen_title: input_update done");
 
         if (in_palette_test) {
             if (input_any_pressed()) {
@@ -148,10 +151,11 @@ void screen_title(void) {
         /* ---- Render (s? quando necess?rio) ---- */
         if (!needs_redraw) continue;
         needs_redraw = 0u;
-
+        KLog("screen_title: calling render_clear_content inside loop");
         render_clear_content();
+        KLog("screen_title: render_clear_content done");
 
-        /* T?tulo: amarelo sobre fundo azul escuro                    */
+        KLog("screen_title: rendering title text");
         render_text(BG_A, "ELIFOOT II",
                     15u, (u16)(CONTENT_ROW_FIRST + 1u), PAL_MAIN);
         render_text(BG_A, "Selecione a sua equipa:",
