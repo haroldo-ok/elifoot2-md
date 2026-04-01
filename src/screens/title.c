@@ -155,9 +155,12 @@ void screen_title(void) {
         render_clear_content();
         KLog("screen_title: render_clear_content done");
 
-        KLog("screen_title: rendering title text");
+        KLog("screen_title: rendering title text - calling render_text row 4");
+        /* TEST: write at row 0 to confirm PAL_MAIN text visible */
+        render_text(BG_A, "ELI", 0u, 0u, PAL_MAIN);
         render_text(BG_A, "ELIFOOT II",
                     15u, (u16)(CONTENT_ROW_FIRST + 1u), PAL_MAIN);
+        KLog_U1("screen_title: title written at row", (u32)(CONTENT_ROW_FIRST + 1u));
         render_text(BG_A, "Selecione a sua equipa:",
                     9u, (u16)(CONTENT_ROW_FIRST + 3u), PAL_MAIN);
 
@@ -165,6 +168,7 @@ void screen_title(void) {
         render_hline(BG_A, 1u, (u16)(CONTENT_ROW_FIRST + 4u),
                      38u, BOX_SIMPLE, PAL_MAIN);
 
+        KLog("screen_title: starting team list render");
         /* Lista de equipes com scroll                                 */
         for (i = 0u; i < nav.page_size; i++) {
             u16 team_idx = (u16)(nav.page_top + i);
@@ -201,6 +205,7 @@ void screen_title(void) {
                         PAL_MAIN);
         }
 
+        KLog("screen_title: render complete, calling help bar");
         /* Help bar contextual                                         */
         render_help_bar("[A]Selecionar  [C]Teste de cores  [^v]Navegar",
                         (const char *)0);
