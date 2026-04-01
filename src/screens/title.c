@@ -14,6 +14,7 @@
 #define PAGE_TEAMS  18u
 
 u8 screen_title(void) {
+    KLog("screen_title: START");
     u8  sel   = 0u;
     u8  top   = 0u;
     u8  total = (u8)TEAM_COUNT;
@@ -21,6 +22,7 @@ u8 screen_title(void) {
     u8  redraw = 1u;
 
     for (;;) {
+        KLog("screen_title: vblank");
         ui_wait_vblank();
         input_update();
 
@@ -46,9 +48,10 @@ u8 screen_title(void) {
 
         if (!redraw) continue;
         redraw = 0u;
-
+        KLog("screen_title: redrawing");
         ui_clear();
 
+        KLog("screen_title: writing header");
         ui_puts(13u, 0u, UI_PAL_NORMAL, "* ELIFOOT II *");
         ui_puts( 0u, 1u, UI_PAL_NORMAL, "Selecione a sua equipa:");
         ui_hline(0u, 2u, UI_COLS, UI_PAL_NORMAL);
@@ -66,6 +69,7 @@ u8 screen_title(void) {
                       (u16)(idx + 1u), g_teams[idx].name);
         }
 
+        KLog("screen_title: render done");
         ui_hline(0u, 25u, UI_COLS, UI_PAL_NORMAL);
         ui_puts( 0u, 26u, UI_PAL_NORMAL, "CIMA/BAIXO: navegar   A/C: confirmar");
     }

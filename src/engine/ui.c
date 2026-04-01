@@ -71,34 +71,42 @@ static const u16 s_pal1[16] = {
  * ------------------------------------------------------------------ */
 
 void ui_init(void) {
+    KLog("ui_init: START");
     /* 1. VDP_init() e chamado em main() antes de ui_init(). */
 
     /* 2. Desactivar o plano WINDOW completamente.
      *    Reg 0x11 (HPos) = 0 com bit7=0 -> sem window horizontal.
      *    Reg 0x12 (VPos) = 0 com bit7=0 -> window cobre 0 linhas do topo.
      *    Isto garante que BG_A e visivel em TODAS as 28 linhas. */
+    KLog("ui_init: disabling WINDOW");
     VDP_setWindowVPos(FALSE, 0);
     VDP_setWindowHPos(FALSE, 0);
 
     /* 3. Scroll a zero em ambos os planos. */
+    KLog("ui_init: resetting scroll");
     VDP_setVerticalScroll(BG_A, 0);
     VDP_setHorizontalScroll(BG_A, 0);
     VDP_setVerticalScroll(BG_B, 0);
     VDP_setHorizontalScroll(BG_B, 0);
 
     /* 4. Carregar paletas (sincrono, sem DMA). */
+    KLog("ui_init: loading palettes");
     PAL_setColors(0,  s_pal0, 16, CPU);
     PAL_setColors(16, s_pal1, 16, CPU);
 
     /* 5. Cor de backdrop = PAL0[0] = azul escuro.
      *    VDP_setBackgroundColor toma um indice global (0-63).
      *    PAL0 ocupa indices 0-15, logo PAL0[0] = indice 0. */
+    KLog("ui_init: backdrop color set");
     VDP_setBackgroundColor(0);
 
     /* 6. Carregar fonte (CPU, sincrono -- sem DMA para evitar problemas
      *    de timing antes do primeiro VBlank). */
+    KLog("ui_init: loading font CPU");
     VDP_loadTileData(font_tile_data, FONT_FIRST_TILE, FONT_NUM_TILES, CPU);
+    KLog("ui_init: font loaded");
 
+    KLog("ui_init: clearing BG_A");
     /* 7. Limpar BG_A inteiro com tile de espaco.
      * Loop manual via VDP_setTileMapXY = CPU, sincrono, sem DMA.
      * Evita a race condition onde o DMA apaga o texto escrito depois. */
@@ -109,6 +117,7 @@ void ui_init(void) {
             for (_c = 0u; _c < UI_COLS; _c++)
                 VDP_setTileMapXY(BG_A, _attr, _c, _r);
     }
+    KLog("ui_init: DONE");
 }
 
 /* ------------------------------------------------------------------
@@ -116,12 +125,14 @@ void ui_init(void) {
  * ------------------------------------------------------------------ */
 
 void ui_clear(void) {
+    KLog("ui_clear: START");
     /* Loop CPU -- VDP_setTileMapXY e sincrono, sem DMA queue. */
     u16 _r, _c;
     u16 _attr = TILE_ATTR(PAL0, TILE_SPACE);
     for (_r = 0u; _r < UI_ROWS; _r++)
         for (_c = 0u; _c < UI_COLS; _c++)
             VDP_setTileMapXY(BG_A, _attr, _c, _r);
+    KLog("ui_clear: DONE");
 }
 
 /* ------------------------------------------------------------------
