@@ -130,8 +130,8 @@ void render_init(void) {
     /* a tela -- renderizaremos nas coordenadas corretas diretamente.   */
 
     /* Limpa todos os planes.                                           */
-    VDP_clearTileMapRect(BG_A, 0, 0, 40, 28);
-    VDP_clearTileMapRect(BG_B, 0, 0, 40, 28);
+    VDP_fillTileMapRect(BG_A, ELF_TILE(FONT_BASE_TILE, PAL0, 0), 0, 0, 40, 28);
+    VDP_fillTileMapRect(BG_B, ELF_TILE(FONT_BASE_TILE, PAL0, 0), 0, 0, 40, 28);
     VDP_clearTileMapRect(WINDOW, 0, 0, 40, 28);
 
     /* Push WINDOW off-screen -- by default SGDK sets WINDOW to cover
@@ -268,9 +268,10 @@ void render_number(VDPPlane plane, long value,
 /* ------------------------------------------------------------------ */
 
 void render_clear_rect(VDPPlane plane, u16 x, u16 y, u16 w, u16 h) {
-    /* VDP_clearTileMapRect() existe no SGDK 1.70 -- usa DMA interno,  */
-    /* muito mais r?pido do que um loop manual de VDP_setTileMapXY.   */
-    VDP_clearTileMapRect(plane, x, y, w, h);
+    /* Fill with SPACE tile (FONT_BASE_TILE) instead of tile 0.
+     * Tile 0 contains SGDK system data and would show as visual noise.
+     * FONT_BASE_TILE (16) is our blank space glyph -- looks transparent. */
+    VDP_fillTileMapRect(plane, ELF_TILE(FONT_BASE_TILE, PAL0, 0), x, y, w, h);
 }
 
 /* ------------------------------------------------------------------ */
@@ -363,13 +364,17 @@ void render_set_bg_color(u16 bg_pal0_entry) {
      * Na pr?tica: a cor de fundo do VDP (reg 0x07) ? o ?ndice global
      * na paleta combinada (0-63). PAL0 ocupa ?ndices 0-15.
      */
-    VDP_setBackgroundColor((u8)bg_pal0_entry);  /* cor de borda do VDP */
+    /* VDP_setBackgroundColor sets the border/backdrop colour index.
+     * bg_pal0_entry is a PAL0 colour index (0-15) for the backdrop.   */
+    VDP_setBackgroundColor((u8)bg_pal0_entry);
 
-    /* Preenche BG_B com tile 0 na paleta que tem bg_pal0_entry[0]     */
-    /* como cor de fundo. Como tile 0 ? vazio (todos pixels = ?ndice 0 */
-    /* da paleta), e PAL0[0] e PAL0[1] s?o as cores de bg dispon?veis, */
-    /* basta preencher BG_B com tile 0, PAL0.                          */
-    render_fill_rect(BG_B, 0u, 0u, SCREEN_COLS, SCREEN_ROWS, PAL0, 0u);
+    /* Fill BG_B with our SPACE tile (FONT_BASE_TILE = tile 16, ASCII 32).
+     * Tile 16 is the first user tile -- a blank 8x8 glyph from our font.
+     * We use PAL0 so colour[0] of PAL0 is the background pixel colour.
+     * This avoids tile 0 which contains SGDK system/SEGA logo pixel data
+     * and would produce the red/blue stripe artefact.                  */
+    render_fill_rect(BG_B, 0u, 0u, SCREEN_COLS, SCREEN_ROWS,
+                     PAL0, (u16)FONT_BASE_TILE);
 }
 
 /* ------------------------------------------------------------------ */
@@ -458,7 +463,7 @@ void render_clear_content(void) {
      * Estrat?gia: limpar BG_A (conte?do principal) inteiro, e depois
      * redesenhar a status bar no WINDOW para garantir estado limpo.
      */
-    VDP_clearTileMapRect(BG_A, 0, 0, 40, 28);
+    VDP_fillTileMapRect(BG_A, ELF_TILE(FONT_BASE_TILE, PAL0, 0), 0, 0, 40, 28);
     VDP_clearTileMapRect(WINDOW, 0, 0, 40, 28);
 
     /* Redesenha barras fixas ap?s limpar o WINDOW.                    */
