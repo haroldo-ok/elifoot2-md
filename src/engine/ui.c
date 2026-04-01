@@ -99,9 +99,16 @@ void ui_init(void) {
      *    de timing antes do primeiro VBlank). */
     VDP_loadTileData(font_tile_data, FONT_FIRST_TILE, FONT_NUM_TILES, CPU);
 
-    /* 7. Limpar BG_A e BG_B com tile de espaco. */
-    VDP_clearPlane(BG_A, TRUE);
-    VDP_clearPlane(BG_B, TRUE);
+    /* 7. Limpar BG_A inteiro com tile de espaco.
+     * Loop manual via VDP_setTileMapXY = CPU, sincrono, sem DMA.
+     * Evita a race condition onde o DMA apaga o texto escrito depois. */
+    {
+        u16 _r, _c;
+        u16 _attr = TILE_ATTR(PAL0, TILE_SPACE);
+        for (_r = 0u; _r < UI_ROWS; _r++)
+            for (_c = 0u; _c < UI_COLS; _c++)
+                VDP_setTileMapXY(BG_A, _attr, _c, _r);
+    }
 }
 
 /* ------------------------------------------------------------------
@@ -109,7 +116,12 @@ void ui_init(void) {
  * ------------------------------------------------------------------ */
 
 void ui_clear(void) {
-    VDP_clearPlane(BG_A, TRUE);
+    /* Loop CPU -- VDP_setTileMapXY e sincrono, sem DMA queue. */
+    u16 _r, _c;
+    u16 _attr = TILE_ATTR(PAL0, TILE_SPACE);
+    for (_r = 0u; _r < UI_ROWS; _r++)
+        for (_c = 0u; _c < UI_COLS; _c++)
+            VDP_setTileMapXY(BG_A, _attr, _c, _r);
 }
 
 /* ------------------------------------------------------------------
