@@ -1,13 +1,13 @@
 /*
- * screens/coaches.c — Gestão de treinadores
+ * screens/coaches.c -- Gest?o de treinadores
  *
  * Strings literais fiel ao original:
  *   "TREINADORES EM JOGO"
  *   "[nome] foi despedido do [clube]"
  *   "Para o seu lugar foi escolhido [novo]"
- *   "F1  Anular treinador"  → [A] Despedir
- *   "F2  Novo treinador"    → [B] Contratar
- *   "Esc Fim"               → [Start] Voltar
+ *   "F1  Anular treinador"  -> [A] Despedir
+ *   "F2  Novo treinador"    -> [B] Contratar
+ *   "Esc Fim"               -> [Start] Voltar
  */
 
 #include <genesis.h>
@@ -49,7 +49,7 @@ static void render_coach_list(ListNav *nav) {
     u8  i;
 
     render_clear_content();
-    render_text(BG_A, "NOVO TREINADOR — Escolha:",
+    render_text(BG_A, "NOVO TREINADOR -- Escolha:",
                 2u, row++, PAL_MAIN);
     render_hline(BG_A, 1u, row++, 38u, BOX_SIMPLE, PAL_MAIN);
 
@@ -129,7 +129,7 @@ void screen_coaches(void) {
                              team->name);
                 render_text(BG_A, "Para o seu lugar foi escolhido...",
                             2u, row++, PAL_MAIN);
-                render_text(BG_A, "(nenhum — contrate um novo)",
+                render_text(BG_A, "(nenhum -- contrate um novo)",
                             2u, row, PAL_MAIN);
                 render_help_bar("[A/B] Continuar", NULL);
                 for (;;) {
@@ -160,7 +160,7 @@ void screen_coaches(void) {
                     if (input_pressed(BTN_CONFIRM)) {
                         u8 new_coach = nav.selected;
 
-                        /* Aplica chicotada psicológica */
+                        /* Aplica chicotada psicol?gica */
                         render_clear_content();
                         row = (u16)CONTENT_ROW_FIRST;
                         render_textf(BG_A, 2u, row++, PAL_MAIN,

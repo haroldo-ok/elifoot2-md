@@ -1,35 +1,35 @@
 /*
- * game/data.c — Carga de dados ROM→RAM e estado global do jogo
+ * game/data.c -- Carga de dados ROM->RAM e estado global do jogo
  *
- * Fase 1: leitura real dos binários gerados por pack_data.py e
+ * Fase 1: leitura real dos bin?rios gerados por pack_data.py e
  * embebidos na ROM pelo rescomp (teams_data[], coaches_data[]).
  *
- * Layout binário de teams.bin (big-endian):
+ * Layout bin?rio de teams.bin (big-endian):
  *   [0..1]  u16 team_count        = 29
  *   [2..3]  u16 players_per_team  = 16
- *   Por equipe (offset 4 + t×410):
+ *   Por equipe (offset 4 + t?410):
  *     TeamRecord [26 bytes]:
  *       [+0..+19]  char name[20]   NUL-terminated ASCII
  *       [+20]      u8  n1
  *       [+21]      u8  n2
  *       [+22..+24] char nac[3]     ex "POR" (sem NUL)
  *       [+25]      u8  _pad
- *     PlayerRecord [24 bytes] × 16, imediatamente após:
+ *     PlayerRecord [24 bytes] ? 16, imediatamente ap?s:
  *       [+0..+15]  char name[16]   NUL-terminated ASCII
  *       [+16]      u8  pos         0=GR 1=DF 2=MD 3=AV
  *       [+17..+19] char nac[3]     ex "POR"
  *       [+20..+23] u8  _pad[4]
  *
- * Layout binário de coaches.bin:
+ * Layout bin?rio de coaches.bin:
  *   [0..1]  u16 coach_count = 50
- *   Por coach (offset 2 + c×20):
+ *   Por coach (offset 2 + c?20):
  *     CoachRecord [20 bytes]: char name[20] NUL-terminated ASCII
  *
  * Strength inicial dos jogadores:
  *   base = 75 - n2_equipe * 3   (n2=0 forte, n2=15 fraco)
  *   strength = clamp(base + rng_range(20) - 10, 20, 99)
  *
- * Salary inicial: strength * 150L escudos/mês.
+ * Salary inicial: strength * 150L escudos/m?s.
  */
 
 #include <genesis.h>
@@ -50,7 +50,7 @@
 #include "../../res/resources.h"
 
 /* ------------------------------------------------------------------ */
-/* Constantes de layout binário (mirror de pack_data.py)              */
+/* Constantes de layout bin?rio (mirror de pack_data.py)              */
 /* ------------------------------------------------------------------ */
 
 #define BIN_TEAM_NAME_LEN    20u

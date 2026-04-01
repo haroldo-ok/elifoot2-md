@@ -1,16 +1,16 @@
 /*
- * game/season.c — Coordenação de temporada completa
+ * game/season.c -- Coordena??o de temporada completa
  *
  * season_run() orquestra:
- *   1. Reset de estatísticas
+ *   1. Reset de estat?sticas
  *   2. Por cada jornada:
- *      a. Menu pré-jornada
- *      b. Simulação de todos os jogos da jornada
- *      c. Pagamento de salários (cada 4 jornadas)
- *      d. Exibição de resultados
- *   3. Fim: prémios, promoção/rebaixamento
+ *      a. Menu pr?-jornada
+ *      b. Simula??o de todos os jogos da jornada
+ *      c. Pagamento de sal?rios (cada 4 jornadas)
+ *      d. Exibi??o de resultados
+ *   3. Fim: pr?mios, promo??o/rebaixamento
  *
- * SYS_doVBlankProcess() APENAS nos loops de input — nunca na simulação.
+ * SYS_doVBlankProcess() APENAS nos loops de input -- nunca na simula??o.
  * int = 16 bits: contadores de jornada usam u8.
  */
 
@@ -29,7 +29,7 @@
 #include "../screens/coaches.h"
 
 /* ------------------------------------------------------------------ */
-/* Telas auxiliares (implementação inline, Fase 3 separa em screens/) */
+/* Telas auxiliares (implementa??o inline, Fase 3 separa em screens/) */
 /* ------------------------------------------------------------------ */
 
 static void show_standings(u8 div) {
@@ -167,13 +167,13 @@ void season_run(void) {
         g_round = round;
         render_status_bar();
 
-        /* Menu pré-jornada                                           */
+        /* Menu pr?-jornada                                           */
         pre_round_menu();
 
         /* Limpa buffer de resultados para esta jornada               */
         g_results_count = 0u;
 
-        /* Simula todas as divisões (sem vsync)                       */
+        /* Simula todas as divis?es (sem vsync)                       */
         for (d = 0u; d < 2u; d++) {
             u8 cur_div    = (d == 0u) ? div : (u8)(1u - div);
             u8 cur_rounds = league_total_rounds(cur_div);
@@ -204,7 +204,7 @@ void season_run(void) {
             }
         }
 
-        /* Salários a cada 4 jornadas                                 */
+        /* Sal?rios a cada 4 jornadas                                 */
         if ((round % 4u) == 0u) {
             economy_pay_monthly_salaries();
         }
@@ -213,7 +213,7 @@ void season_run(void) {
         show_results(div, round);
     }
 
-    /* Salário final se necessário                                    */
+    /* Sal?rio final se necess?rio                                    */
     if ((total_rounds % 4u) != 0u) {
         economy_pay_monthly_salaries();
     }
@@ -247,7 +247,7 @@ void screen_season_end(void) {
     g_palmares[0].player_div    = g_division;
     g_palmares[0].player_pos    = player_pos;
 
-    /* Promoção / rebaixamento                                        */
+    /* Promo??o / rebaixamento                                        */
     {
         u8 old_div = g_division;
         data_assign_divisions();

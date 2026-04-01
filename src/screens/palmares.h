@@ -3,7 +3,7 @@
 
 #include <genesis.h>
 
-/* screens/palmares.h — Palmarés e histórico das últimas 5 temporadas */
+/* screens/palmares.h -- Palmar?s e hist?rico das ?ltimas 5 temporadas */
 
 void screen_palmares(void);
 

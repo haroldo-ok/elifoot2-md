@@ -1,98 +1,98 @@
 /*
- * render.c — Sistema de renderização textual para Elifoot II Genesis
+ * render.c -- Sistema de renderiza??o textual para Elifoot II Genesis
  *
  * SGDK 1.70 / m68k-elf-gcc caveats respeitados:
- *   - int = 16 bits: todos os contadores de loop e índices usam u16/u8.
- *   - VDP_loadTileSet() usa DMA — não chamar dentro de VBlank.
- *   - VDP_setTileMapXY() escreve diretamente no tilemap — nenhuma
+ *   - int = 16 bits: todos os contadores de loop e ?ndices usam u16/u8.
+ *   - VDP_loadTileSet() usa DMA -- n?o chamar dentro de VBlank.
+ *   - VDP_setTileMapXY() escreve diretamente no tilemap -- nenhuma
  *     chamada a SYS_doVBlankProcess() dentro de loops de render.
- *   - VDP_clearPlane(WINDOW, TRUE) é obrigatório ao trocar de tela
- *     para evitar resíduos de texto.
+ *   - VDP_clearPlane(WINDOW, TRUE) ? obrigat?rio ao trocar de tela
+ *     para evitar res?duos de texto.
  *   - PAL_setColors() com DMA em vez de PAL_setPalette() para arrays
- *     de u16 — PAL_setPalette() espera estrutura Palette do SGDK.
+ *     de u16 -- PAL_setPalette() espera estrutura Palette do SGDK.
  */
 
 #include <genesis.h>
 #include <stdarg.h>
 #include "render.h"
 
-/* Declaração externa da estrutura de game state mínima necessária
+/* Declara??o externa da estrutura de game state m?nima necess?ria
  * para render_status_bar(). Definida em game/data.h.
- * Incluída aqui apenas para os campos de leitura (season, round, etc.). */
-extern u8  g_season_num;       /* número da temporada atual             */
+ * Inclu?da aqui apenas para os campos de leitura (season, round, etc.). */
+extern u8  g_season_num;       /* n?mero da temporada atual             */
 extern u8  g_round;            /* jornada atual                         */
-extern u8  g_player_team_idx;  /* índice da equipe do jogador           */
-extern u8  g_division;         /* divisão atual da equipe do jogador    */
+extern u8  g_player_team_idx;  /* ?ndice da equipe do jogador           */
+extern u8  g_division;         /* divis?o atual da equipe do jogador    */
 extern long g_money;           /* dinheiro atual da equipe do jogador   */
 
 /* Forward-declared from res/resources.h (gerado pelo rescomp).
- * TILESET font_tiles — carregada via resources.res */
+ * TILESET font_tiles -- carregada via resources.res */
 extern TileSet font_tiles;
 
 /* ------------------------------------------------------------------ */
 /* Dados de paleta (formato Genesis: 0x0BGR, 9 bits por cor)           */
 /*                                                                      */
-/* ATENÇÃO: o format word do VDP Genesis é 0x0BGR (Blue nos bits       */
-/* altos), NÃO 0x0RGB. Azul escuro (#0000AA) = 0x0600 (B=6).          */
+/* ATEN??O: o format word do VDP Genesis ? 0x0BGR (Blue nos bits       */
+/* altos), N?O 0x0RGB. Azul escuro (#0000AA) = 0x0600 (B=6).          */
 /* ------------------------------------------------------------------ */
 
 static const u16 pal0_data[16] = {
-    0x0000,  /* [0]  preto          — background transparente padrão    */
-    0x0600,  /* [1]  azul escuro    — background alternativo (título)   */
-    0x0EEE,  /* [2]  branco         — texto padrão                      */
-    0x02EE,  /* [3]  amarelo        — títulos, cabeçalhos               */
-    0x0EE2,  /* [4]  ciano brilhante— subtítulos, informações           */
-    0x02E2,  /* [5]  verde brilhante— valores positivos                 */
-    0x022E,  /* [6]  vermelho br.   — valores negativos                 */
-    0x0666,  /* [7]  cinza claro    — texto secundário                  */
-    0x0606,  /* [8]  magenta        — alertas                           */
-    0x0660,  /* [9]  ciano escuro   — bordas de caixa, separadores      */
-    0x0222,  /* [10] cinza escuro   — comentários muito discretos       */
-    0x0E2E,  /* [11] magenta br.    — reserva                           */
-    0x0026,  /* [12] marrom         — reserva                           */
-    0x0060,  /* [13] verde escuro   — reserva                           */
-    0x0E00,  /* [14] azul brilhante — reserva                           */
-    0x0EEE,  /* [15] branco (dup.)  — cursor animado                    */
+    0x0000,  /* [0]  preto          -- background transparente padr?o    */
+    0x0600,  /* [1]  azul escuro    -- background alternativo (t?tulo)   */
+    0x0EEE,  /* [2]  branco         -- texto padr?o                      */
+    0x02EE,  /* [3]  amarelo        -- t?tulos, cabe?alhos               */
+    0x0EE2,  /* [4]  ciano brilhante-- subt?tulos, informa??es           */
+    0x02E2,  /* [5]  verde brilhante-- valores positivos                 */
+    0x022E,  /* [6]  vermelho br.   -- valores negativos                 */
+    0x0666,  /* [7]  cinza claro    -- texto secund?rio                  */
+    0x0606,  /* [8]  magenta        -- alertas                           */
+    0x0660,  /* [9]  ciano escuro   -- bordas de caixa, separadores      */
+    0x0222,  /* [10] cinza escuro   -- coment?rios muito discretos       */
+    0x0E2E,  /* [11] magenta br.    -- reserva                           */
+    0x0026,  /* [12] marrom         -- reserva                           */
+    0x0060,  /* [13] verde escuro   -- reserva                           */
+    0x0E00,  /* [14] azul brilhante -- reserva                           */
+    0x0EEE,  /* [15] branco (dup.)  -- cursor animado                    */
 };
 
 static const u16 pal1_data[16] = {
-    0x0660,  /* [0]  ciano escuro   — background dominante (cursor/bar) */
-    0x0000,  /* [1]  preto          — texto sobre ciano (inversão)      */
-    0x0EEE,  /* [2]  branco         — texto secundário sobre ciano      */
-    0x02EE,  /* [3]  amarelo        — destaque sobre ciano              */
-    0x02E2,  /* [4]  verde brilhante— valores positivos sobre ciano     */
-    0x022E,  /* [5]  vermelho br.   — valores negativos sobre ciano     */
-    0x0EE2,  /* [6]  ciano brilhante— reserva                           */
-    0x0EEE,  /* [7]  branco         — reserva                           */
+    0x0660,  /* [0]  ciano escuro   -- background dominante (cursor/bar) */
+    0x0000,  /* [1]  preto          -- texto sobre ciano (invers?o)      */
+    0x0EEE,  /* [2]  branco         -- texto secund?rio sobre ciano      */
+    0x02EE,  /* [3]  amarelo        -- destaque sobre ciano              */
+    0x02E2,  /* [4]  verde brilhante-- valores positivos sobre ciano     */
+    0x022E,  /* [5]  vermelho br.   -- valores negativos sobre ciano     */
+    0x0EE2,  /* [6]  ciano brilhante-- reserva                           */
+    0x0EEE,  /* [7]  branco         -- reserva                           */
     /* [8..15] espelha [0..7] para uso futuro                           */
     0x0660, 0x0000, 0x0EEE, 0x02EE,
     0x02E2, 0x022E, 0x0EE2, 0x0EEE,
 };
 
-/* PAL2 e PAL3 são inicializadas como cópias de PAL0 e podem ser       */
-/* personalizadas por equipe. Definidas como mutáveis (não const).     */
+/* PAL2 e PAL3 s?o inicializadas como c?pias de PAL0 e podem ser       */
+/* personalizadas por equipe. Definidas como mut?veis (n?o const).     */
 static u16 pal2_data[16];
 static u16 pal3_data[16];
 
 /* ------------------------------------------------------------------ */
-/* Tile de fundo sólido                                                 */
+/* Tile de fundo s?lido                                                 */
 /* ------------------------------------------------------------------ */
 
 /*
- * SOLID_TILE_IDX: tile 0 da VRAM — por convenção do SGDK, o tile 0 é
+ * SOLID_TILE_IDX: tile 0 da VRAM -- por conven??o do SGDK, o tile 0 ?
  * sempre o tile "vazio" (todos os pixels em cor 0). Usar como background
- * transparente. Para tile sólido com cor, usamos o tile 0 com paleta
- * diferente, aproveitando que cor [0] de cada paleta é o background.
+ * transparente. Para tile s?lido com cor, usamos o tile 0 com paleta
+ * diferente, aproveitando que cor [0] de cada paleta ? o background.
  */
 #define SOLID_TILE_IDX  0u
 
 /* ------------------------------------------------------------------ */
-/* Implementação interna                                               */
+/* Implementa??o interna                                               */
 /* ------------------------------------------------------------------ */
 
 /*
- * write_tile() — Escreve um único tile no tilemap.
- * Macro inline para performance — evita overhead de call em loops.
+ * write_tile() -- Escreve um ?nico tile no tilemap.
+ * Macro inline para performance -- evita overhead de call em loops.
  */
 #define write_tile(plane, tile_idx, pal, prio, cx, cy) \
     VDP_setTileMapXY((plane), \
@@ -104,7 +104,7 @@ static u16 pal3_data[16];
 /* ------------------------------------------------------------------ */
 
 void render_init(void) {
-    /* Inicializa PAL2/PAL3 como cópias de PAL0.                       */
+    /* Inicializa PAL2/PAL3 como c?pias de PAL0.                       */
     u16 i;
     for (i = 0; i < 16; i++) {
         pal2_data[i] = pal0_data[i];
@@ -118,22 +118,22 @@ void render_init(void) {
     PAL_setColors(48, pal3_data, 16, DMA);
 
     /* Carrega fonte na VRAM a partir do tile FONT_BASE_TILE.           */
-    /* font_tiles é definida em res/resources.h pelo rescomp.           */
+    /* font_tiles ? definida em res/resources.h pelo rescomp.           */
     VDP_loadTileSet(&font_tiles, FONT_BASE_TILE, DMA);
 
     /* Configura o WINDOW plane para aparecer sobre BG_A.              */
-    /* Posição do WINDOW: cobre linhas 0–2 (topo) e 25–27 (rodapé).   */
-    /* O SGDK permite configurar onde o WINDOW começa verticalmente.   */
-    /* Não setamos aqui pois o padrão do SGDK já cobre o WINDOW toda   */
-    /* a tela — renderizaremos nas coordenadas corretas diretamente.   */
+    /* Posi??o do WINDOW: cobre linhas 0-2 (topo) e 25-27 (rodap?).   */
+    /* O SGDK permite configurar onde o WINDOW come?a verticalmente.   */
+    /* N?o setamos aqui pois o padr?o do SGDK j? cobre o WINDOW toda   */
+    /* a tela -- renderizaremos nas coordenadas corretas diretamente.   */
 
     /* Limpa todos os planes.                                           */
     VDP_clearPlane(BG_A,   TRUE);
     VDP_clearPlane(BG_B,   TRUE);
     VDP_clearPlane(WINDOW, TRUE);
 
-    /* Configura BG_B como fundo sólido preto (tile 0, PAL0[0]=preto). */
-    /* render_set_bg_color(0) fará isso explicitamente quando chamado, */
+    /* Configura BG_B como fundo s?lido preto (tile 0, PAL0[0]=preto). */
+    /* render_set_bg_color(0) far? isso explicitamente quando chamado, */
     /* mas garantimos estado limpo aqui.                               */
 }
 
@@ -149,14 +149,14 @@ void render_text(VDPPlane plane, const char *str, u16 x, u16 y, u16 pal_idx) {
     while (*p != '\0') {
         c = (u8)*p++;
 
-        /* Pula chars fora do range da fonte (32–127).                 */
-        /* Avança x para manter alinhamento com o comprimento da string.*/
+        /* Pula chars fora do range da fonte (32-127).                 */
+        /* Avan?a x para manter alinhamento com o comprimento da string.*/
         if (c < 32u || c > 127u) {
             if (cx < SCREEN_COLS) cx++;
             continue;
         }
 
-        if (cx >= SCREEN_COLS) break;  /* não escrever além da borda  */
+        if (cx >= SCREEN_COLS) break;  /* n?o escrever al?m da borda  */
 
         write_tile(plane, CHAR_TO_TILE(c), pal_idx, 0, cx, y);
         cx++;
@@ -197,7 +197,7 @@ void render_text_pad(VDPPlane plane, const char *str,
         write_tile(plane, CHAR_TO_TILE(c), pal_idx, 0, cx, y);
         cx++;
     }
-    /* Preenche o restante com espaço (tile do char 32)                */
+    /* Preenche o restante com espa?o (tile do char 32)                */
     while (cx < end) {
         write_tile(plane, CHAR_TO_TILE(32u), pal_idx, 0, cx, y);
         cx++;
@@ -211,11 +211,11 @@ void render_text_pad(VDPPlane plane, const char *str,
 void render_number(VDPPlane plane, long value,
                    u16 x, u16 y, u16 width, u16 pal_idx) {
     /*
-     * Formata número com separadores de milhar (ponto), alinhado à
-     * direita em 'width' colunas. Números negativos mostram '-'.
-     * Ex: 1234567 → "1.234.567"
+     * Formata n?mero com separadores de milhar (ponto), alinhado ?
+     * direita em 'width' colunas. N?meros negativos mostram '-'.
+     * Ex: 1234567 -> "1.234.567"
      *
-     * Estratégia: formata de trás para frente num buffer local,
+     * Estrat?gia: formata de tr?s para frente num buffer local,
      * depois renderiza centralizado/alinhado.
      */
     char buf[16];
@@ -252,7 +252,7 @@ void render_number(VDPPlane plane, long value,
     const char *p = num_str;
     while (*p++) slen++;
 
-    /* Alinha à direita dentro de 'width'                              */
+    /* Alinha ? direita dentro de 'width'                              */
     u16 pad = (slen < width) ? (u16)(width - slen) : 0u;
     render_clear_rect(plane, x, y, pad, 1u);
     render_text(plane, num_str, (u16)(x + pad), y, pal_idx);
@@ -263,8 +263,8 @@ void render_number(VDPPlane plane, long value,
 /* ------------------------------------------------------------------ */
 
 void render_clear_rect(VDPPlane plane, u16 x, u16 y, u16 w, u16 h) {
-    /* VDP_clearTileMapRect() existe no SGDK 1.70 — usa DMA interno,  */
-    /* muito mais rápido do que um loop manual de VDP_setTileMapXY.   */
+    /* VDP_clearTileMapRect() existe no SGDK 1.70 -- usa DMA interno,  */
+    /* muito mais r?pido do que um loop manual de VDP_setTileMapXY.   */
     VDP_clearTileMapRect(plane, x, y, w, h);
 }
 
@@ -274,7 +274,7 @@ void render_clear_rect(VDPPlane plane, u16 x, u16 y, u16 w, u16 h) {
 
 void render_fill_rect(VDPPlane plane, u16 x, u16 y, u16 w, u16 h,
                       u16 pal_idx, u16 tile_idx) {
-    /* VDP_fillTileMapRect() existe no SGDK 1.70 — usa DMA interno.   */
+    /* VDP_fillTileMapRect() existe no SGDK 1.70 -- usa DMA interno.   */
     VDP_fillTileMapRect(plane, TILE_ATTR(tile_idx, pal_idx, 0), x, y, w, h);
 }
 
@@ -286,33 +286,33 @@ void render_box(VDPPlane plane, u16 x, u16 y, u16 w, u16 h,
                 u16 style, u16 pal_idx) {
     /*
      * Box-drawing tile layout a partir de BOX_BASE_TILE:
-     *   Simple (+0..+5):  ─ │ ┌ ┐ └ ┘
-     *   Double (+6..+11): ═ ║ ╔ ╗ ╚ ╝
-     *   Crossings (+12):  ┼
+     *   Simple (+0..+5):  ? ? ? ? ? ?
+     *   Double (+6..+11): ? ? ? ? ? ?
+     *   Crossings (+12):  ?
      */
     u16 base = (style == BOX_DOUBLE) ? (BOX_BASE_TILE + 6u) : BOX_BASE_TILE;
     /* Offsets dentro do bloco de estilo:
-     *   0=─/═  1=│/║  2=┌/╔  3=┐/╗  4=└/╚  5=┘/╝  */
+     *   0=?/?  1=?/?  2=?/?  3=?/?  4=?/?  5=?/?  */
     u16 cx, cy;
     u16 x2 = x + w - 1u;
     u16 y2 = y + h - 1u;
 
     /* Cantos                                                           */
-    write_tile(plane, base + 2u, pal_idx, 0, x,  y);   /* ┌/╔ */
-    write_tile(plane, base + 3u, pal_idx, 0, x2, y);   /* ┐/╗ */
-    write_tile(plane, base + 4u, pal_idx, 0, x,  y2);  /* └/╚ */
-    write_tile(plane, base + 5u, pal_idx, 0, x2, y2);  /* ┘/╝ */
+    write_tile(plane, base + 2u, pal_idx, 0, x,  y);   /* ?/? */
+    write_tile(plane, base + 3u, pal_idx, 0, x2, y);   /* ?/? */
+    write_tile(plane, base + 4u, pal_idx, 0, x,  y2);  /* ?/? */
+    write_tile(plane, base + 5u, pal_idx, 0, x2, y2);  /* ?/? */
 
     /* Linhas horizontais (superior e inferior)                        */
     for (cx = x + 1u; cx < x2; cx++) {
-        write_tile(plane, base + 0u, pal_idx, 0, cx, y);   /* ─/═ */
-        write_tile(plane, base + 0u, pal_idx, 0, cx, y2);  /* ─/═ */
+        write_tile(plane, base + 0u, pal_idx, 0, cx, y);   /* ?/? */
+        write_tile(plane, base + 0u, pal_idx, 0, cx, y2);  /* ?/? */
     }
 
     /* Linhas verticais (esquerda e direita)                           */
     for (cy = y + 1u; cy < y2; cy++) {
-        write_tile(plane, base + 1u, pal_idx, 0, x,  cy);  /* │/║ */
-        write_tile(plane, base + 1u, pal_idx, 0, x2, cy);  /* │/║ */
+        write_tile(plane, base + 1u, pal_idx, 0, x,  cy);  /* ?/? */
+        write_tile(plane, base + 1u, pal_idx, 0, x2, cy);  /* ?/? */
     }
 }
 
@@ -325,7 +325,7 @@ void render_hline(VDPPlane plane, u16 x, u16 y, u16 len,
     u16 base = (style == BOX_DOUBLE) ? (BOX_BASE_TILE + 6u) : BOX_BASE_TILE;
     u16 cx;
     for (cx = x; cx < x + len; cx++) {
-        write_tile(plane, base + 0u, pal_idx, 0, cx, y);  /* ─/═ */
+        write_tile(plane, base + 0u, pal_idx, 0, cx, y);  /* ?/? */
     }
 }
 
@@ -334,7 +334,7 @@ void render_vline(VDPPlane plane, u16 x, u16 y, u16 len,
     u16 base = (style == BOX_DOUBLE) ? (BOX_BASE_TILE + 6u) : BOX_BASE_TILE;
     u16 cy;
     for (cy = y; cy < y + len; cy++) {
-        write_tile(plane, base + 1u, pal_idx, 0, x, cy);  /* │/║ */
+        write_tile(plane, base + 1u, pal_idx, 0, x, cy);  /* ?/? */
     }
 }
 
@@ -346,23 +346,23 @@ void render_set_bg_color(u16 bg_pal0_entry) {
     /*
      * Preenche BG_B com tile 0 usando a paleta PAL0.
      * A cor de fundo vem de PAL0[bg_pal0_entry].
-     * Como o tile 0 é totalmente transparente/vazio, todos os seus
+     * Como o tile 0 ? totalmente transparente/vazio, todos os seus
      * pixels usam a "cor 0" da paleta selecionada para o tile.
      *
-     * Mas espera — para ter uma cor sólida no BG_B, precisamos de um
+     * Mas espera -- para ter uma cor s?lida no BG_B, precisamos de um
      * tile cujos pixels sejam da cor desejada, ou usar a cor de borda
      * do VDP (VDP_setBackgroundColor). Usamos VDP_setBackgroundColor
      * para a cor de fundo real do VDP (cor "exterior"), e preenchemos
      * BG_B com SOLID_TILE_IDX para garantir cobertura total.
      *
-     * Na prática: a cor de fundo do VDP (reg 0x07) é o índice global
-     * na paleta combinada (0–63). PAL0 ocupa índices 0–15.
+     * Na pr?tica: a cor de fundo do VDP (reg 0x07) ? o ?ndice global
+     * na paleta combinada (0-63). PAL0 ocupa ?ndices 0-15.
      */
     VDP_setBackgroundColor((u8)bg_pal0_entry);  /* cor de borda do VDP */
 
     /* Preenche BG_B com tile 0 na paleta que tem bg_pal0_entry[0]     */
-    /* como cor de fundo. Como tile 0 é vazio (todos pixels = índice 0 */
-    /* da paleta), e PAL0[0] e PAL0[1] são as cores de bg disponíveis, */
+    /* como cor de fundo. Como tile 0 ? vazio (todos pixels = ?ndice 0 */
+    /* da paleta), e PAL0[0] e PAL0[1] s?o as cores de bg dispon?veis, */
     /* basta preencher BG_B com tile 0, PAL0.                          */
     render_fill_rect(BG_B, 0u, 0u, SCREEN_COLS, SCREEN_ROWS, PAL0, 0u);
 }
@@ -374,38 +374,38 @@ void render_set_bg_color(u16 bg_pal0_entry) {
 void render_status_bar(void) {
     /*
      * Desenha as barras fixas no WINDOW:
-     *   Linha 0: borda superior (─ repetida)
+     *   Linha 0: borda superior (? repetida)
      *   Linha 1: " ELIFOOT II  Jornada:XX  DivX  $XXXXXXX "
-     *   Linha 2: borda separadora (─ repetida)
+     *   Linha 2: borda separadora (? repetida)
      *
      * Usa PAL1 (ciano escuro como bg, texto preto/amarelo).
      */
 
-    /* Linha 0: borda dupla superior (═ repetida)                      */
+    /* Linha 0: borda dupla superior (? repetida)                      */
     render_fill_rect(WINDOW, 0u, 0u, SCREEN_COLS, 1u, PAL_SELECTED, 0u);
     render_hline(WINDOW, 0u, 0u, SCREEN_COLS, BOX_DOUBLE, PAL_SELECTED);
 
-    /* Linha 1: conteúdo da status bar                                 */
+    /* Linha 1: conte?do da status bar                                 */
     render_fill_rect(WINDOW, 0u, STATUS_ROW, SCREEN_COLS, 1u,
                      PAL_SELECTED, 0u);
 
-    /* Texto principal da status bar (preto sobre ciano — PAL1[1])    */
+    /* Texto principal da status bar (preto sobre ciano -- PAL1[1])    */
     render_text(WINDOW, "ELIFOOT II", 1u, STATUS_ROW, PAL_SELECTED);
 
     /* Jornada: amarelo sobre ciano (PAL1[3])                          */
     render_textf(WINDOW, 14u, STATUS_ROW, PAL_SELECTED,
                  "Jornada:%02u", (u16)g_round);
 
-    /* Divisão                                                          */
+    /* Divis?o                                                          */
     render_textf(WINDOW, 25u, STATUS_ROW, PAL_SELECTED,
                  "Div%u", (u16)(g_division + 1u));
 
-    /* Dinheiro: amarelo sobre ciano — usamos PAL1 aqui porque o texto
-     * já aparece sobre o fundo ciano e PAL1[3]=amarelo dá destaque.  */
+    /* Dinheiro: amarelo sobre ciano -- usamos PAL1 aqui porque o texto
+     * j? aparece sobre o fundo ciano e PAL1[3]=amarelo d? destaque.  */
     render_textf(WINDOW, 30u, STATUS_ROW, PAL_SELECTED,
                  "$%ld", g_money);
 
-    /* Linha 2: borda separadora (═)                                   */
+    /* Linha 2: borda separadora (?)                                   */
     render_fill_rect(WINDOW, 0u, 2u, SCREEN_COLS, 1u, PAL_SELECTED, 0u);
     render_hline(WINDOW, 0u, 2u, SCREEN_COLS, BOX_DOUBLE, PAL_SELECTED);
 
@@ -433,7 +433,7 @@ void render_help_bar(const char *line1, const char *line2) {
     if (line2 != (const char *)0) {
         render_fill_rect(WINDOW, 0u, 27u, SCREEN_COLS, 1u,
                          PAL_SELECTED, 0u);
-        /* linha 27 já é borda — exibimos em linha 26 apenas, linha 27
+        /* linha 27 j? ? borda -- exibimos em linha 26 apenas, linha 27
          * permanece como borda inferior desenhada por render_status_bar */
         (void)line2;  /* reservado para uso futuro com 2 linhas de help */
     }
@@ -445,17 +445,17 @@ void render_help_bar(const char *line1, const char *line2) {
 
 void render_clear_content(void) {
     /*
-     * CRÍTICO: VDP_clearPlane(WINDOW, TRUE) é obrigatório ao trocar
-     * de tela — resíduos de texto no WINDOW persistem se não limpar.
-     * Aqui limpamos apenas a área de conteúdo para preservar a
-     * status bar já renderizada.
+     * CR?TICO: VDP_clearPlane(WINDOW, TRUE) ? obrigat?rio ao trocar
+     * de tela -- res?duos de texto no WINDOW persistem se n?o limpar.
+     * Aqui limpamos apenas a ?rea de conte?do para preservar a
+     * status bar j? renderizada.
      *
-     * Estratégia: limpar BG_A (conteúdo principal) inteiro, e depois
+     * Estrat?gia: limpar BG_A (conte?do principal) inteiro, e depois
      * redesenhar a status bar no WINDOW para garantir estado limpo.
      */
     VDP_clearPlane(BG_A,   TRUE);
     VDP_clearPlane(WINDOW, TRUE);
 
-    /* Redesenha barras fixas após limpar o WINDOW.                    */
+    /* Redesenha barras fixas ap?s limpar o WINDOW.                    */
     render_status_bar();
 }

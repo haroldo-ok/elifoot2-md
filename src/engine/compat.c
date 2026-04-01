@@ -1,17 +1,17 @@
 /*
- * compat.c — Funções ausentes em libmd.a do SGDK 1.70
+ * compat.c -- Fun??es ausentes em libmd.a do SGDK 1.70
  *
- * CRÍTICO: NÃO usar #ifndef SGDK_GCC neste arquivo.
- * Estas funções compilam e linkam em TODOS os builds.
- * O linker do SGDK vai usar estas implementações quando libmd.a
- * não fornecer os símbolos correspondentes.
+ * CR?TICO: N?O usar #ifndef SGDK_GCC neste arquivo.
+ * Estas fun??es compilam e linkam em TODOS os builds.
+ * O linker do SGDK vai usar estas implementa??es quando libmd.a
+ * n?o fornecer os s?mbolos correspondentes.
  *
  * m68k caveats:
  *   - int = 16 bits: todos os contadores de loop usam u16.
- *   - Sem stdlib.h disponível — não usar tipos como size_t.
- *   - Ponteiros têm 32 bits (sizeof(void*) = 4 no m68k).
- *   - Não usar __builtin_memset / __builtin_memcpy — bypassam
- *     -fno-builtin e têm assinatura diferente.
+ *   - Sem stdlib.h dispon?vel -- n?o usar tipos como size_t.
+ *   - Ponteiros t?m 32 bits (sizeof(void*) = 4 no m68k).
+ *   - N?o usar __builtin_memset / __builtin_memcpy -- bypassam
+ *     -fno-builtin e t?m assinatura diferente.
  */
 
 #include <genesis.h>
@@ -23,10 +23,10 @@
 
 void *compat_memmove(void *dst, const void *src, u16 len) {
     /*
-     * Trata sobreposição de regiões:
-     *   - Se dst < src ou não há sobreposição: copia de frente para trás.
-     *   - Se dst > src e há sobreposição: copia de trás para frente
-     *     para evitar corromper dados ainda não copiados.
+     * Trata sobreposi??o de regi?es:
+     *   - Se dst < src ou n?o h? sobreposi??o: copia de frente para tr?s.
+     *   - Se dst > src e h? sobreposi??o: copia de tr?s para frente
+     *     para evitar corromper dados ainda n?o copiados.
      */
     u8 *d = (u8 *)dst;
     const u8 *s = (const u8 *)src;
@@ -37,12 +37,12 @@ void *compat_memmove(void *dst, const void *src, u16 len) {
     }
 
     if (d < s) {
-        /* Sem risco de sobreposição nesta direção: copia para frente. */
+        /* Sem risco de sobreposi??o nesta dire??o: copia para frente. */
         for (i = 0u; i < len; i++) {
             d[i] = s[i];
         }
     } else {
-        /* dst > src: possível sobreposição — copia de trás para frente.*/
+        /* dst > src: poss?vel sobreposi??o -- copia de tr?s para frente.*/
         i = len;
         while (i > 0u) {
             i--;
@@ -73,7 +73,7 @@ s16 compat_strncmp(const char *s1, const char *s2, u16 n) {
             return 0;  /* ambos chegaram ao NUL simultaneamente         */
         }
     }
-    return 0;  /* primeiros n chars idênticos                          */
+    return 0;  /* primeiros n chars id?nticos                          */
 }
 
 /* ------------------------------------------------------------------ */
@@ -85,7 +85,7 @@ long compat_atol(const char *s) {
     u8 negative = 0u;
     const char *p = s;
 
-    /* Pula espaços iniciais.                                          */
+    /* Pula espa?os iniciais.                                          */
     while (*p == ' ' || *p == '\t') p++;
 
     /* Sinal opcional.                                                 */
@@ -96,7 +96,7 @@ long compat_atol(const char *s) {
         p++;
     }
 
-    /* Dígitos. Usa long arithmetic — int seria 16 bits aqui.         */
+    /* D?gitos. Usa long arithmetic -- int seria 16 bits aqui.         */
     while (*p >= '0' && *p <= '9') {
         result = result * 10L + (long)(*p - '0');
         p++;
@@ -112,8 +112,8 @@ long compat_atol(const char *s) {
 char *compat_ltoa(long value, char *buf) {
     /*
      * Converte long para string decimal.
-     * Estratégia: preenche de trás para frente, depois reverte.
-     * buf precisa de pelo menos 12 bytes: sinal(1) + dígitos(10) + NUL(1).
+     * Estrat?gia: preenche de tr?s para frente, depois reverte.
+     * buf precisa de pelo menos 12 bytes: sinal(1) + d?gitos(10) + NUL(1).
      */
     u8 pos = 0u;
     u8 start = 0u;
@@ -134,7 +134,7 @@ char *compat_ltoa(long value, char *buf) {
             buf[pos++] = (char)('0' + (u8)(v % 10L));
             v /= 10L;
         }
-        /* Reverte apenas a parte numérica (após o sinal).             */
+        /* Reverte apenas a parte num?rica (ap?s o sinal).             */
         i = start;
         j = (u8)(pos - 1u);
         while (i < j) {

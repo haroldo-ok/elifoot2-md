@@ -1,14 +1,14 @@
 /*
- * screens/squad.c — Gestão de plantel e formação
+ * screens/squad.c -- Gest?o de plantel e forma??o
  *
- * Layout da tela (40×22 linhas de conteúdo):
+ * Layout da tela (40?22 linhas de conte?do):
  *
  *   Linha  3: "PLANTEL: SAO PAULO    Formacao: 4-4-2"
- *   Linha  4: "─────────────────────────────────────"
- *   Linha  5: "[*] Zetti         GR  85  1500 esc"  ← titular
- *   Linha  6: "[ ] Rogerio       GR  72  1200 esc"  ← banco
+ *   Linha  4: "?????????????????????????????????????"
+ *   Linha  5: "[*] Zetti         GR  85  1500 esc"  <- titular
+ *   Linha  6: "[ ] Rogerio       GR  72  1200 esc"  <- banco
  *   ...
- *   Linha 20: "─────────────────────────────────────"
+ *   Linha 20: "?????????????????????????????????????"
  *   Linha 21: "Em campo: 11  Banco: 5"
  *   Linha 22: "GR:1 DF:4 MD:4 AV:2"
  *
@@ -35,14 +35,14 @@
 /* Constantes                                                          */
 /* ------------------------------------------------------------------ */
 
-/* Nomes das formações (fiel ao original — F1=3-4-3, F3=4-4-2, etc.) */
+/* Nomes das forma??es (fiel ao original -- F1=3-4-3, F3=4-4-2, etc.) */
 static const char * const s_form_names[FORM_COUNT] = {
     "4-4-2", "4-3-3", "3-5-2", "5-3-2",
     "4-5-1", "3-4-3", "5-4-1", "4-2-4",
     "3-3-4", "5-2-3",
 };
 
-/* Distribuição GR/DF/MD/AV por formação [GR é sempre 1]             */
+/* Distribui??o GR/DF/MD/AV por forma??o [GR ? sempre 1]             */
 /*                          GR DF MD AV */
 static const u8 s_form_dist[FORM_COUNT][4] = {
     {1, 4, 4, 2},  /* 4-4-2 */
@@ -57,10 +57,10 @@ static const u8 s_form_dist[FORM_COUNT][4] = {
     {1, 5, 2, 3},  /* 5-2-3 */
 };
 
-/* Abreviaturas de posição para display                               */
+/* Abreviaturas de posi??o para display                               */
 static const char * const s_pos_abbr[4] = { "GR", "DF", "MD", "AV" };
 
-/* Paleta por posição                                                  */
+/* Paleta por posi??o                                                  */
 static const u16 s_pos_pal[4] = {
     PAL_MAIN,   /* GR: usaremos FG_CYAN_BR mas simplificamos p/ PAL0  */
     PAL_MAIN,   /* DF: branco                                          */
@@ -74,9 +74,9 @@ static const u16 s_pos_pal[4] = {
 
 static void auto_select(u8 team_idx) {
     /*
-     * Selecciona os 11 melhores jogadores para a formação actual,
-     * respeitando a distribuição GR/DF/MD/AV.
-     * Algoritmo: para cada posição, coloca em campo os N mais fortes.
+     * Selecciona os 11 melhores jogadores para a forma??o actual,
+     * respeitando a distribui??o GR/DF/MD/AV.
+     * Algoritmo: para cada posi??o, coloca em campo os N mais fortes.
      */
     Team *team = &g_teams[team_idx];
     Formation form = (Formation)team->formation;
@@ -96,12 +96,12 @@ static void auto_select(u8 team_idx) {
         g_players[(u16)team->player_start + i].on_field = 0u;
     }
 
-    /* Para cada posição: coloca os N mais fortes                      */
+    /* Para cada posi??o: coloca os N mais fortes                      */
     for (pos = 0u; pos < 4u; pos++) {
         u8 need = targets[pos];
         u8 done = 0u;
 
-        /* Passagem simples: encontra o mais forte ainda não colocado */
+        /* Passagem simples: encontra o mais forte ainda n?o colocado */
         while (done < need) {
             u8  best_i    = 0xFFu;
             u8  best_str  = 0u;
@@ -110,7 +110,7 @@ static void auto_select(u8 team_idx) {
             for (i = 0u; i < team->player_count; i++) {
                 Player *pl = &g_players[(u16)team->player_start + i];
                 if (pl->pos != pos)        continue;
-                if (pl->on_field)          continue;  /* já colocado  */
+                if (pl->on_field)          continue;  /* j? colocado  */
                 if (pl->strength > best_str || !found) {
                     best_str = pl->strength;
                     best_i   = i;
@@ -139,7 +139,7 @@ static void render_squad(u8 team_idx, u8 sel, u8 scroll_top) {
 
     render_clear_content();
 
-    /* Título                                                          */
+    /* T?tulo                                                          */
     render_textf(BG_A, 1u, row, PAL_MAIN,
                  "PLANTEL: %-16s Form: %s",
                  team->name,
@@ -147,7 +147,7 @@ static void render_squad(u8 team_idx, u8 sel, u8 scroll_top) {
     row++;
     render_hline(BG_A, 1u, row++, 38u, BOX_SIMPLE, PAL_MAIN);
 
-    /* Cabeçalho de colunas                                            */
+    /* Cabe?alho de colunas                                            */
     render_text(BG_A, " T  Nome            Pos Forca Ordenado",
                 1u, row++, PAL_MAIN);
     render_hline(BG_A, 1u, row++, 38u, BOX_SIMPLE, PAL_MAIN);
@@ -224,7 +224,7 @@ void screen_squad(void) {
         /* Voltar                                                      */
         if (input_pressed(BTN_CANCEL)) return;
 
-        /* Mudar formação (Y)                                         */
+        /* Mudar forma??o (Y)                                         */
         if (input_pressed(BTN_FORMATION)) {
             team->formation = (u8)((team->formation + 1u) % (u8)FORM_COUNT);
             needs_redraw = 1u;
@@ -248,8 +248,8 @@ void screen_squad(void) {
             u8      on = pl->on_field;
 
             if (on) {
-                /* Tirar do campo — verificar mínimos                  */
-                /* Mínimo 1 GR sempre                                 */
+                /* Tirar do campo -- verificar m?nimos                  */
+                /* M?nimo 1 GR sempre                                 */
                 u8 gk_on = 0u;
                 u8 j;
                 for (j = 0u; j < team->player_count; j++) {
@@ -257,7 +257,7 @@ void screen_squad(void) {
                     if (p2->on_field && p2->pos == (u8)POS_GR) gk_on++;
                 }
                 if (pl->pos == (u8)POS_GR && gk_on <= 1u) {
-                    /* Não pode retirar o único GR — feedback visual  */
+                    /* N?o pode retirar o ?nico GR -- feedback visual  */
                     render_text(BG_A,
                         "Precisa de pelo menos 1 GR em campo!",
                         1u, (u16)(CONTENT_ROW_LAST - 2u), PAL_MAIN);
@@ -266,7 +266,7 @@ void screen_squad(void) {
                     needs_redraw = 1u;
                 }
             } else {
-                /* Pôr em campo — verificar se já tem 11             */
+                /* P?r em campo -- verificar se j? tem 11             */
                 u8 total_on = 0u, j;
                 for (j = 0u; j < team->player_count; j++) {
                     if (g_players[(u16)team->player_start + j].on_field)

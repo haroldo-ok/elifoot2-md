@@ -1,14 +1,14 @@
 /*
- * game/cup.c — Copa com eliminatórias em 2 mãos
+ * game/cup.c -- Copa com eliminat?rias em 2 m?os
  *
  * m68k / SGDK 1.70 caveats:
- *   - int = 16 bits: índices e contadores usam u8/u16.
- *   - NÃO chama SYS_doVBlankProcess() nos loops de simulação.
- *   - Penáltis simulados com rng_range() — sem vsync.
+ *   - int = 16 bits: ?ndices e contadores usam u8/u16.
+ *   - N?O chama SYS_doVBlankProcess() nos loops de simula??o.
+ *   - Pen?ltis simulados com rng_range() -- sem vsync.
  *
  * Algoritmo de sorteio (potes):
  *   Pote A: equipas com n1 par  (0, 2, 4, 6, ...)
- *   Pote B: equipas com n1 ímpar (1, 3, 5, ...)
+ *   Pote B: equipas com n1 ?mpar (1, 3, 5, ...)
  *   Cada par: 1 equipa do pote A vs 1 equipa do pote B.
  *   Se desequilibrado, completa com restantes do pote maior.
  *   Equipas sorteadas aleatoriamente dentro de cada pote.
@@ -38,7 +38,7 @@ const char *cup_phase_name(u8 phase) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Utilitários internos                                                */
+/* Utilit?rios internos                                                */
 /* ------------------------------------------------------------------ */
 
 /* Shuffle de um array de u8 de comprimento n (Fisher-Yates) */
@@ -53,8 +53,8 @@ static void shuffle_u8(u8 *arr, u8 n) {
     }
 }
 
-/* Simula série de penáltis entre team_a e team_b.
- * Retorna índice do vencedor (team_a ou team_b). */
+/* Simula s?rie de pen?ltis entre team_a e team_b.
+ * Retorna ?ndice do vencedor (team_a ou team_b). */
 static u8 simulate_penalties(u8 team_a, u8 team_b) {
     u8  score_a = 0u, score_b = 0u;
     u8  k;
@@ -64,12 +64,12 @@ static u8 simulate_penalties(u8 team_a, u8 team_b) {
     if (total == 0u) total = 1u;
     u16 prob_a = (u16)(((u32)str_a * 100UL) / (u32)total);
 
-    /* 5 penáltis cada; converte ~75% */
+    /* 5 pen?ltis cada; converte ~75% */
     for (k = 0u; k < 5u; k++) {
         if (rng_range(100u) < 75u && rng_range(100u) < prob_a)   score_a++;
         if (rng_range(100u) < 75u && rng_range(100u) < (u16)(100u - prob_a)) score_b++;
     }
-    /* Morte súbita se empatados após 5 */
+    /* Morte s?bita se empatados ap?s 5 */
     while (score_a == score_b) {
         if (rng_range(100u) < 75u && rng_range(100u) < prob_a)   score_a++;
         if (rng_range(100u) < 75u && rng_range(100u) < (u16)(100u - prob_a)) score_b++;
@@ -84,10 +84,10 @@ static u8 simulate_penalties(u8 team_a, u8 team_b) {
 u8 cup_draw(void) {
     /*
      * Selecciona as 16 participantes:
-     *   Primeiro: equipas da Div1 (até 16)
+     *   Primeiro: equipas da Div1 (at? 16)
      *   Completar com equipas da Div2 com n1 > 0 (se Div1 < 16)
      *
-     * Separa em dois potes pelo valor de n1 (par / ímpar).
+     * Separa em dois potes pelo valor de n1 (par / ?mpar).
      * Faz o sorteio e cria os pares em g_cup_ties[].
      */
     u8 participants[16];
@@ -117,7 +117,7 @@ u8 cup_draw(void) {
         }
     }
 
-    /* Marca equipas não participantes como eliminadas */
+    /* Marca equipas n?o participantes como eliminadas */
     for (t = 0u; t < (u8)TEAM_COUNT; t++) {
         u8 found = 0u;
         for (i = 0u; i < np; i++) {
@@ -126,7 +126,7 @@ u8 cup_draw(void) {
         if (!found) g_teams[t].cup_active = 0u;
     }
 
-    /* Separa em potes: n1 par → A, ímpar → B */
+    /* Separa em potes: n1 par -> A, ?mpar -> B */
     for (i = 0u; i < np; i++) {
         u8 team = participants[i];
         if ((g_teams[team].n1 & 1u) == 0u) {
@@ -165,18 +165,18 @@ u8 cup_draw(void) {
 
 void cup_simulate_leg(u8 leg) {
     u8 i;
-    /* NÃO chama SYS_doVBlankProcess() */
+    /* N?O chama SYS_doVBlankProcess() */
     for (i = 0u; i < g_cup_ties_count; i++) {
         CupTie    *tie  = &g_cup_ties[i];
         MatchResult res;
 
         if (leg == 0u) {
-            /* 1ª mão: team_a em casa */
+            /* 1? m?o: team_a em casa */
             res = match_simulate(tie->team_a, tie->team_b);
             tie->goals_a_leg1 = res.home_goals;
             tie->goals_b_leg1 = res.away_goals;
         } else {
-            /* 2ª mão: team_b em casa (invertido) */
+            /* 2? m?o: team_b em casa (invertido) */
             res = match_simulate(tie->team_b, tie->team_a);
             tie->goals_b_leg2 = res.home_goals;
             tie->goals_a_leg2 = res.away_goals;
@@ -191,11 +191,11 @@ void cup_simulate_leg(u8 leg) {
 u8 cup_advance(void) {
     /*
      * Determina vencedores de cada confronto pelo agregado.
-     * Em empate: quem marcou mais golos fora na 2ª mão avança.
-     * Se ainda empate: penáltis.
+     * Em empate: quem marcou mais golos fora na 2? m?o avan?a.
+     * Se ainda empate: pen?ltis.
      *
      * Cria confrontos da fase seguinte em g_cup_ties[].
-     * Se era a Final (fase 4): retorna o campeão.
+     * Se era a Final (fase 4): retorna o campe?o.
      */
     u8  winners[8];
     u8  nw = 0u;
@@ -213,7 +213,7 @@ u8 cup_advance(void) {
         } else if (agg_b > agg_a) {
             winner = tie->team_b;
         } else {
-            /* Regra de golos fora: team_b jogou fora na 1ª mão */
+            /* Regra de golos fora: team_b jogou fora na 1? m?o */
             /* Golos de team_b fora (leg1) vs team_a fora (leg2) */
             if (tie->goals_b_leg1 > tie->goals_a_leg2) {
                 winner = tie->team_b;
@@ -230,7 +230,7 @@ u8 cup_advance(void) {
         g_teams[loser].cup_active = 0u;
     }
 
-    /* Final: apenas 1 confronto → retorna campeão */
+    /* Final: apenas 1 confronto -> retorna campe?o */
     if (g_cup_phase >= 4u) {
         if (nw > 0u) {
             cup_winner = winners[0];
@@ -239,11 +239,11 @@ u8 cup_advance(void) {
         return cup_winner;
     }
 
-    /* Avança para a próxima fase */
+    /* Avan?a para a pr?xima fase */
     g_cup_phase++;
     g_cup_ties_count = 0u;
 
-    /* Shuffle dos vencedores para criar novos confrontos aleatórios */
+    /* Shuffle dos vencedores para criar novos confrontos aleat?rios */
     shuffle_u8(winners, nw);
 
     for (i = 0u; i + 1u < nw; i += 2u) {

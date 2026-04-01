@@ -4,7 +4,7 @@
 #include <genesis.h>
 
 /*
- * screens/coaches.h — Gestão de treinadores
+ * screens/coaches.h -- Gest?o de treinadores
  *
  * Tela "TREINADORES EM JOGO" (fiel ao original, offset 0x1e443).
  * Permite:
@@ -12,13 +12,13 @@
  *   [B] Contratar novo treinador (lista dos 50)
  *   [Start] Voltar
  *
- * Ao mudar treinador: "chicotada psicológica" — boost de força
- * temporário de +5 a todos os titulares por 3 jornadas.
+ * Ao mudar treinador: "chicotada psicol?gica" -- boost de for?a
+ * tempor?rio de +5 a todos os titulares por 3 jornadas.
  * String literal: "[nome] foi despedido do [clube]"
  *                 "Para o seu lugar foi escolhido [novo]"
  */
 
-/* Boost temporário aplicado ao mudar treinador (jornadas) */
+/* Boost tempor?rio aplicado ao mudar treinador (jornadas) */
 #define COACH_BOOST_ROUNDS  3u
 #define COACH_BOOST_STRENGTH 5u
 
@@ -28,7 +28,7 @@ extern u8 g_coach_boost_rounds;  /* jornadas restantes de boost */
 
 void screen_coaches(void);
 
-/* Chamada por season_run() no início de cada jornada para decrementar boost */
+/* Chamada por season_run() no in?cio de cada jornada para decrementar boost */
 void coaches_tick_boost(void);
 
 #endif /* ELIFOOT_COACHES_H */

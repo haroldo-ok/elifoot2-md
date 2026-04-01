@@ -1,10 +1,10 @@
 /*
- * game/transfer.c — Transferências e leilão por salário
+ * game/transfer.c -- Transfer?ncias e leil?o por sal?rio
  *
  * m68k caveats:
- *   - long para todos os valores monetários (int = 16 bits).
- *   - u16 para índices de jogadores (464 > 255 — não usar u8).
- *   - Sem malloc: todos os buffers são locais ou arrays estáticos globais.
+ *   - long para todos os valores monet?rios (int = 16 bits).
+ *   - u16 para ?ndices de jogadores (464 > 255 -- n?o usar u8).
+ *   - Sem malloc: todos os buffers s?o locais ou arrays est?ticos globais.
  *   - compat_memmove() para mover blocos de Player[] ao compactar plantel.
  */
 
@@ -31,7 +31,7 @@ u8 transfer_player(u16 player_idx, u8 from_team, u8 to_team, long new_salary) {
     dst = &g_teams[to_team];
     pl  = &g_players[player_idx];
 
-    /* Atualiza finanças                                               */
+    /* Atualiza finan?as                                               */
     src->salary_total -= pl->salary;
     dst->salary_total += new_salary;
     pl->salary         = new_salary;
@@ -39,11 +39,11 @@ u8 transfer_player(u16 player_idx, u8 from_team, u8 to_team, long new_salary) {
     /*
      * Move o jogador no array g_players[]:
      *
-     * Estratégia: o jogador está em player_idx dentro do bloco de src.
-     * Precisamos removê-lo do bloco de src e inseri-lo no bloco de dst.
+     * Estrat?gia: o jogador est? em player_idx dentro do bloco de src.
+     * Precisamos remov?-lo do bloco de src e inseri-lo no bloco de dst.
      *
-     * Para simplicidade e segurança no m68k (sem malloc), usamos
-     * uma cópia temporária local do registro do jogador:
+     * Para simplicidade e seguran?a no m68k (sem malloc), usamos
+     * uma c?pia tempor?ria local do registro do jogador:
      */
     {
         Player  tmp;
@@ -52,7 +52,7 @@ u8 transfer_player(u16 player_idx, u8 from_team, u8 to_team, long new_salary) {
         /* Guarda o jogador                                            */
         tmp = *pl;
         tmp.salary   = new_salary;
-        tmp.on_field = 0u;   /* novo na equipa: começa no banco        */
+        tmp.on_field = 0u;   /* novo na equipa: come?a no banco        */
 
         /* Remove do bloco de src (compacta)                          */
         {
@@ -69,9 +69,9 @@ u8 transfer_player(u16 player_idx, u8 from_team, u8 to_team, long new_salary) {
         }
 
         /*
-         * Após remover do src, todos os player_start de equipas
-         * com índice > src->player_start precisam ser decrementados
-         * se o seu bloco está "à direita" do slot removido.
+         * Ap?s remover do src, todos os player_start de equipas
+         * com ?ndice > src->player_start precisam ser decrementados
+         * se o seu bloco est? "? direita" do slot removido.
          */
         for (i = 0u; i < (u8)TEAM_COUNT; i++) {
             if (i == from_team) continue;
@@ -83,7 +83,7 @@ u8 transfer_player(u16 player_idx, u8 from_team, u8 to_team, long new_salary) {
         /* Insere no bloco de dst (no fim do bloco)                   */
         dst_slot = (u16)dst->player_start + (u16)dst->player_count;
 
-        /* Abre espaço no fim do bloco de dst (empurra equipas seguintes) */
+        /* Abre espa?o no fim do bloco de dst (empurra equipas seguintes) */
         if (dst_slot < (u16)(TEAM_COUNT * PLAYERS_PER_TEAM) - 1u) {
             compat_memmove(
                 &g_players[dst_slot + 1u],
@@ -124,11 +124,11 @@ u8 transfer_auction(u16 player_idx, u8 current_team) {
         long budget, offer;
         if (i == current_team) continue;
 
-        /* A IA só faz proposta se tiver orçamento mínimo              */
+        /* A IA s? faz proposta se tiver or?amento m?nimo              */
         budget = g_teams[i].money / 10L;
         if (budget < min_sal) continue;
 
-        /* Proposta: min_sal + variação aleatória até 50% do min_sal   */
+        /* Proposta: min_sal + varia??o aleat?ria at? 50% do min_sal   */
         {
             u16 spread = (u16)(min_sal / 2L > 9999L ? 9999L : min_sal / 2L);
             offer = min_sal + (long)rng_range(spread + 1u);
@@ -162,11 +162,11 @@ u8 transfer_ai_buy(u8 team_idx) {
     if (team_idx >= (u8)TEAM_COUNT) return 0u;
     team = &g_teams[team_idx];
 
-    /* Orçamento para contratação: até 20% do dinheiro disponível     */
+    /* Or?amento para contrata??o: at? 20% do dinheiro dispon?vel     */
     salary = team->money / 5L;
     if (salary <= 0L) return 0u;
 
-    /* Força do jogador derivada do salário que a equipa pode pagar    */
+    /* For?a do jogador derivada do sal?rio que a equipa pode pagar    */
     strength = (u8)(salary / 100L);
     if (strength < 20u) strength = 20u;
     if (strength > 99u) strength = 99u;
@@ -174,7 +174,7 @@ u8 transfer_ai_buy(u8 team_idx) {
     /* Adiciona jogador no fim do bloco da equipa                      */
     if ((u16)team->player_start + (u16)team->player_count >=
         (u16)(TEAM_COUNT * PLAYERS_PER_TEAM)) {
-        return 0u;  /* sem espaço no array global — caso extremo        */
+        return 0u;  /* sem espa?o no array global -- caso extremo        */
     }
 
     slot = (u16)team->player_start + (u16)team->player_count;
@@ -194,14 +194,14 @@ u8 transfer_ai_buy(u8 team_idx) {
     }
 
     pl = &g_players[slot];
-    /* Nome genérico para jogador contratado pela IA                   */
+    /* Nome gen?rico para jogador contratado pela IA                   */
     {
         u8 j;
         const char *src = "Jogador";
         for (j = 0u; j < 7u; j++) pl->name[j] = src[j];
         pl->name[7] = '\0';
     }
-    pl->pos      = (u8)POS_DF;   /* padrão: defensor                   */
+    pl->pos      = (u8)POS_DF;   /* padr?o: defensor                   */
     pl->nat      = 0u;
     pl->strength = strength;
     pl->on_field = 0u;

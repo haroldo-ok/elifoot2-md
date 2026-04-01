@@ -1,13 +1,13 @@
 /*
- * screens/main_menu.c — Menu principal pre-jornada completo
+ * screens/main_menu.c -- Menu principal pre-jornada completo
  *
  * Substituicao do stub. Integra todas as telas da Fase 3.
  *
- * Layout (fiel ao original — menu de opcoes numeradas):
+ * Layout (fiel ao original -- menu de opcoes numeradas):
  *
  *   ELIFOOT II  Jornada:XX  DivX  $XXXXXXX   <- status bar (WINDOW)
  *   ==========================================
- *   SAO PAULO  —  Jornada 12 de 15
+ *   SAO PAULO  --  Jornada 12 de 15
  *   ==========================================
  *   [A] Jogar Jornada
  *   [B] Plantel / Formacao

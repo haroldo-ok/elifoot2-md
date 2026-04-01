@@ -4,13 +4,13 @@
 #include <genesis.h>
 
 /*
- * screens/title.h — Tela de título e seleção de equipe
+ * screens/title.h -- Tela de t?tulo e sele??o de equipe
  *
- * STUB Fase 0: mostra título e lista de equipes, permite selecionar.
- * Implementação completa (com opção de load de save) na Fase 3.
+ * STUB Fase 0: mostra t?tulo e lista de equipes, permite selecionar.
+ * Implementa??o completa (com op??o de load de save) na Fase 3.
  */
 
-/* Mostra tela de título, aguarda seleção de equipe.
+/* Mostra tela de t?tulo, aguarda sele??o de equipe.
  * Define g_player_team_idx com a equipe escolhida. */
 void screen_title(void);
 

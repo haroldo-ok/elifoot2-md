@@ -1,18 +1,18 @@
 /*
- * screens/title.c — Tela de título e seleção de equipe
+ * screens/title.c -- Tela de t?tulo e sele??o de equipe
  *
- * Esta implementação serve dois propósitos:
- *   1. Tela de título funcional para Fase 0 (seleção de equipe com ListNav).
+ * Esta implementa??o serve dois prop?sitos:
+ *   1. Tela de t?tulo funcional para Fase 0 (sele??o de equipe com ListNav).
  *   2. Tela de teste de paleta integrada (activar com BTN_ACTION na entrada).
  *
- * A tela de teste de paleta valida visualmente as 16 cores CGA→Genesis
- * antes de avançar para a Fase 1 — é a primeira coisa a verificar no emulador.
+ * A tela de teste de paleta valida visualmente as 16 cores CGA->Genesis
+ * antes de avan?ar para a Fase 1 -- ? a primeira coisa a verificar no emulador.
  *
  * Cores CGA usadas nesta tela (conforme design original):
- *   Título "ELIFOOT II": amarelo (PAL0[3]) sobre preto
+ *   T?tulo "ELIFOOT II": amarelo (PAL0[3]) sobre preto
  *   Lista de equipes: branco (PAL0[2]) sobre preto
  *   Equipe selecionada: preto (PAL1[1]) sobre ciano (PAL1[0])
- *   Instrução "[A] Selecionar": ciano brilhante (PAL0[4])
+ *   Instru??o "[A] Selecionar": ciano brilhante (PAL0[4])
  */
 
 #include <genesis.h>
@@ -27,14 +27,14 @@
 /* ------------------------------------------------------------------ */
 
 /*
- * render_palette_test() — Valida visualmente as cores CGA→Genesis.
+ * render_palette_test() -- Valida visualmente as cores CGA->Genesis.
  *
  * Mostra cada entrada das paletas PAL0 e PAL1 como bloco de texto
- * colorido. Comparar com a tabela de referência em game/types.h e
- * no plano de port Seção 4.2.
+ * colorido. Comparar com a tabela de refer?ncia em game/types.h e
+ * no plano de port Se??o 4.2.
  *
- * Activar: pressionar BTN_ACTION (C) na tela de título.
- * Sair: pressionar qualquer botão.
+ * Activar: pressionar BTN_ACTION (C) na tela de t?tulo.
+ * Sair: pressionar qualquer bot?o.
  */
 static void render_palette_test(void) {
     static const char * const pal0_labels[16] = {
@@ -57,9 +57,9 @@ static void render_palette_test(void) {
                 1u, CONTENT_ROW_FIRST, PAL_MAIN);
 
     /* PAL0: cada entrada como texto sobre fundo preto.
-     * Como a fonte só tem 2 cores (0=bg, 1=fg), cada entrada de paleta
-     * é usada como paleta do tile — a cor do texto corresponde a PAL0[i].
-     * NOTA: só podemos mostrar a cor [2] de PAL0 com PAL_MAIN (branco),
+     * Como a fonte s? tem 2 cores (0=bg, 1=fg), cada entrada de paleta
+     * ? usada como paleta do tile -- a cor do texto corresponde a PAL0[i].
+     * NOTA: s? podemos mostrar a cor [2] de PAL0 com PAL_MAIN (branco),
      * pois render_text() usa a paleta inteira. Esta tela usa PAL_MAIN e
      * PAL_SELECTED para demonstrar os dois esquemas visuais principais.   */
 
@@ -67,7 +67,7 @@ static void render_palette_test(void) {
                 2u, (u16)(CONTENT_ROW_FIRST + 2u), PAL_MAIN);
 
     /* Mostra blocos de cor com PAL0 e PAL1 alternados para demonstrar
-     * a diferença visual. Na ROM real, cada bloco de texto aparece
+     * a diferen?a visual. Na ROM real, cada bloco de texto aparece
      * na cor definida pela paleta selecionada para aquele tile.         */
     for (i = 0u; i < 8u; i++) {
         u16 row = (u16)(CONTENT_ROW_FIRST + 4u + i);
@@ -78,7 +78,7 @@ static void render_palette_test(void) {
     render_text(BG_A, "PAL1 (fundo ciano):",
                 2u, (u16)(CONTENT_ROW_FIRST + 13u), PAL_MAIN);
 
-    /* Demonstra PAL1: texto preto sobre ciano (cursor de seleção)     */
+    /* Demonstra PAL1: texto preto sobre ciano (cursor de sele??o)     */
     render_text_pad(BG_A, "  Item selecionado  ",
                     2u, (u16)(CONTENT_ROW_FIRST + 15u), 20u, PAL_SELECTED);
     render_text_pad(BG_A, "  Status bar        ",
@@ -100,7 +100,7 @@ void screen_title(void) {
     u8 in_palette_test = 0u;
     u16 i;
 
-    list_nav_init(&nav, (u8)TEAM_COUNT, (u8)18u);  /* 18 linhas visíveis */
+    list_nav_init(&nav, (u8)TEAM_COUNT, (u8)18u);  /* 18 linhas vis?veis */
 
     render_set_bg_color(1u);   /* fundo azul escuro (CGA cor 1)        */
     render_clear_content();
@@ -119,14 +119,14 @@ void screen_title(void) {
             continue;
         }
 
-        /* BTN_ACTION (C) → tela de teste de paleta                   */
+        /* BTN_ACTION (C) -> tela de teste de paleta                   */
         if (input_pressed(BTN_ACTION)) {
             in_palette_test = 1u;
             render_palette_test();
             continue;
         }
 
-        /* Confirmar seleção                                           */
+        /* Confirmar sele??o                                           */
         if (input_pressed(BTN_CONFIRM)) {
             g_player_team_idx = nav.selected;
             g_division        = g_teams[nav.selected].division;
@@ -139,13 +139,13 @@ void screen_title(void) {
             needs_redraw = 1u;
         }
 
-        /* ---- Render (só quando necessário) ---- */
+        /* ---- Render (s? quando necess?rio) ---- */
         if (!needs_redraw) continue;
         needs_redraw = 0u;
 
         render_clear_content();
 
-        /* Título: amarelo sobre fundo azul escuro                    */
+        /* T?tulo: amarelo sobre fundo azul escuro                    */
         render_text(BG_A, "ELIFOOT II",
                     15u, (u16)(CONTENT_ROW_FIRST + 1u), PAL_MAIN);
         render_text(BG_A, "Selecione a sua equipa:",

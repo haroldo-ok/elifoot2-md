@@ -1,12 +1,12 @@
 /*
- * input.c — Leitura de controle para Elifoot II Genesis
+ * input.c -- Leitura de controle para Elifoot II Genesis
  *
  * SGDK 1.70 / m68k caveats:
- *   - JOY_init() chamado em input_init() — nunca chamar diretamente.
- *   - JOY_readJoypad() retorna u32 no SGDK 1.70 — usar BUTTON_* para
- *     máscaras, não valores literais.
+ *   - JOY_init() chamado em input_init() -- nunca chamar diretamente.
+ *   - JOY_readJoypad() retorna u32 no SGDK 1.70 -- usar BUTTON_* para
+ *     m?scaras, n?o valores literais.
  *   - int = 16 bits: held_frames usa u16, nunca int.
- *   - Nenhuma chamada a SYS_doVBlankProcess() aqui — só no main loop.
+ *   - Nenhuma chamada a SYS_doVBlankProcess() aqui -- s? no main loop.
  */
 
 #include <genesis.h>
@@ -20,24 +20,24 @@ static u16 s_prev_state;     /* estado do controle no frame anterior   */
 static u16 s_curr_state;     /* estado do controle no frame atual      */
 
 /*
- * s_held_frames[]: contador de frames que cada botão está pressionado.
+ * s_held_frames[]: contador de frames que cada bot?o est? pressionado.
  * Indexado pelos bits do valor retornado por JOY_readJoypad().
- * SGDK define BUTTON_* como potências de 2 — usamos uma array de 16
- * posições correspondente ao número de botões possíveis.
+ * SGDK define BUTTON_* como pot?ncias de 2 -- usamos uma array de 16
+ * posi??es correspondente ao n?mero de bot?es poss?veis.
  *
- * Mapeamento dos bits de JOY_readJoypad() para índice de array:
- *   BUTTON_UP    = 0x0001  → bit 0  → índice 0
- *   BUTTON_DOWN  = 0x0002  → bit 1  → índice 1
- *   BUTTON_LEFT  = 0x0004  → bit 2  → índice 2
- *   BUTTON_RIGHT = 0x0008  → bit 3  → índice 3
- *   BUTTON_A     = 0x0040  → bit 6  → índice 6
- *   BUTTON_B     = 0x0010  → bit 4  → índice 4
- *   BUTTON_C     = 0x0020  → bit 5  → índice 5
- *   BUTTON_START = 0x0080  → bit 7  → índice 7
- *   BUTTON_X     = 0x0400  → bit 10 → índice 10
- *   BUTTON_Y     = 0x0200  → bit 9  → índice 9
- *   BUTTON_Z     = 0x0100  → bit 8  → índice 8
- *   BUTTON_MODE  = 0x0800  → bit 11 → índice 11
+ * Mapeamento dos bits de JOY_readJoypad() para ?ndice de array:
+ *   BUTTON_UP    = 0x0001  -> bit 0  -> ?ndice 0
+ *   BUTTON_DOWN  = 0x0002  -> bit 1  -> ?ndice 1
+ *   BUTTON_LEFT  = 0x0004  -> bit 2  -> ?ndice 2
+ *   BUTTON_RIGHT = 0x0008  -> bit 3  -> ?ndice 3
+ *   BUTTON_A     = 0x0040  -> bit 6  -> ?ndice 6
+ *   BUTTON_B     = 0x0010  -> bit 4  -> ?ndice 4
+ *   BUTTON_C     = 0x0020  -> bit 5  -> ?ndice 5
+ *   BUTTON_START = 0x0080  -> bit 7  -> ?ndice 7
+ *   BUTTON_X     = 0x0400  -> bit 10 -> ?ndice 10
+ *   BUTTON_Y     = 0x0200  -> bit 9  -> ?ndice 9
+ *   BUTTON_Z     = 0x0100  -> bit 8  -> ?ndice 8
+ *   BUTTON_MODE  = 0x0800  -> bit 11 -> ?ndice 11
  */
 #define HELD_ARRAY_SIZE  16u
 static u16 s_held_frames[HELD_ARRAY_SIZE];
@@ -49,7 +49,7 @@ static u16 s_held_frames[HELD_ARRAY_SIZE];
 void input_init(void) {
     u8 i;
 
-    /* CRÍTICO: JOY_init() DEVE ser chamado antes de JOY_readJoypad(). */
+    /* CR?TICO: JOY_init() DEVE ser chamado antes de JOY_readJoypad(). */
     /* Sem isso, JOY_readJoypad() sempre retorna 0.                    */
     JOY_init();
 
@@ -71,7 +71,7 @@ void input_update(void) {
     s_prev_state = s_curr_state;
     s_curr_state = JOY_readJoypad(JOY_1);
 
-    /* Atualiza contadores de hold para cada bit de botão.             */
+    /* Atualiza contadores de hold para cada bit de bot?o.             */
     for (i = 0u; i < HELD_ARRAY_SIZE; i++) {
         bit = (u16)(1u << i);
         if (s_curr_state & bit) {
@@ -90,7 +90,7 @@ void input_update(void) {
 /* ------------------------------------------------------------------ */
 
 u16 input_pressed(u16 btn) {
-    /* Borda de subida: estava 0 no frame anterior, agora é 1.         */
+    /* Borda de subida: estava 0 no frame anterior, agora ? 1.         */
     return (s_curr_state & btn) & (u16)(~s_prev_state & btn);
 }
 
@@ -110,28 +110,28 @@ u16 input_repeat(u16 btn) {
     /*
      * Retorna != 0 em dois casos:
      *   1. Borda de subida (primeiro press neste frame).
-     *   2. Botão mantido pressionado por >= HOLD_INITIAL_FRAMES frames
-     *      E o frame atual é múltiplo de HOLD_REPEAT_FRAMES desde então.
+     *   2. Bot?o mantido pressionado por >= HOLD_INITIAL_FRAMES frames
+     *      E o frame atual ? m?ltiplo de HOLD_REPEAT_FRAMES desde ent?o.
      *
-     * Implementação: encontra o bit de índice mais baixo de 'btn' e
+     * Implementa??o: encontra o bit de ?ndice mais baixo de 'btn' e
      * consulta o contador correspondente em s_held_frames[].
      *
-     * Para o caso comum de btn = um único bit (BUTTON_UP, etc.),
-     * isso é eficiente. Para máscaras multi-bit, testa o bit mais baixo.
+     * Para o caso comum de btn = um ?nico bit (BUTTON_UP, etc.),
+     * isso ? eficiente. Para m?scaras multi-bit, testa o bit mais baixo.
      */
     u8 i;
     u16 bit;
 
-    /* Primeiro press — sempre ativa.                                  */
+    /* Primeiro press -- sempre ativa.                                  */
     if (input_pressed(btn)) return btn;
 
-    /* Hold repeat — encontra o índice do primeiro bit de btn.         */
+    /* Hold repeat -- encontra o ?ndice do primeiro bit de btn.         */
     for (i = 0u; i < HELD_ARRAY_SIZE; i++) {
         bit = (u16)(1u << i);
         if ((btn & bit) == 0u) continue;
         if ((s_curr_state & bit) == 0u) continue;
 
-        /* Botão pressionado — verifica threshold de hold.             */
+        /* Bot?o pressionado -- verifica threshold de hold.             */
         if (s_held_frames[i] >= (u16)HOLD_INITIAL_FRAMES) {
             u16 frames_after_initial =
                 s_held_frames[i] - (u16)HOLD_INITIAL_FRAMES;
@@ -139,7 +139,7 @@ u16 input_repeat(u16 btn) {
                 return bit;
             }
         }
-        break; /* testa apenas o bit mais baixo para eficiência        */
+        break; /* testa apenas o bit mais baixo para efici?ncia        */
     }
     return 0u;
 }
@@ -190,7 +190,7 @@ u8 list_nav_update(ListNav *nav) {
         changed = 1u;
     }
 
-    /* Pular uma página para baixo (Left = Page Down para listas)     */
+    /* Pular uma p?gina para baixo (Left = Page Down para listas)     */
     if (input_pressed(BTN_RIGHT)) {
         u8 new_sel = nav->selected + nav->page_size;
         if (new_sel >= nav->count) new_sel = (u8)(nav->count - 1u);
@@ -204,7 +204,7 @@ u8 list_nav_update(ListNav *nav) {
         }
     }
 
-    /* Pular uma página para cima                                      */
+    /* Pular uma p?gina para cima                                      */
     if (input_pressed(BTN_LEFT)) {
         u8 new_sel;
         if (nav->selected >= nav->page_size) {

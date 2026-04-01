@@ -1,11 +1,11 @@
 /*
- * rng.c — LCG 32 bits para Elifoot II Genesis
+ * rng.c -- LCG 32 bits para Elifoot II Genesis
  *
- * m68k caveat: u32 tem 32 bits — a multiplicação de u32 * u32
- * no m68k produz resultado u32 (truncado), que é exatamente o
- * comportamento desejado para o LCG (aritmética mod 2^32).
+ * m68k caveat: u32 tem 32 bits -- a multiplica??o de u32 * u32
+ * no m68k produz resultado u32 (truncado), que ? exatamente o
+ * comportamento desejado para o LCG (aritm?tica mod 2^32).
  * Usar sufixo UL nas constantes para garantir que o compilador
- * trate como long (32 bits) e não int (16 bits no m68k).
+ * trate como long (32 bits) e n?o int (16 bits no m68k).
  */
 
 #include <genesis.h>

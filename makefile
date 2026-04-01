@@ -1,44 +1,44 @@
-# makefile — Elifoot II Genesis
+# makefile - Elifoot II Genesis
 #
 # Uso:
-#   make          → build completo
-#   make data     → apenas regenera teams.bin e coaches.bin
-#   make clean    → limpa out/ e ficheiros gerados pelo rescomp
-#   make fullclean→ clean + remove data/*.bin
+#   make SGDK=D:/Pessoal/Projetos/sgdk170    (Windows, path sem espacos)
+#   make SGDK=/opt/sgdk170                    (Linux/Mac)
 #
-# Pré-requisito: definir variável SGDK apontando para o diretório
-# de instalação do SGDK 1.70, ou exportar no ambiente:
-#   export SGDK=/opt/sgdk170
+# Alvos:
+#   make          -> build completo (gera dados + ROM)
+#   make data     -> apenas regenera teams.bin e coaches.bin
+#   make font     -> apenas regenera gfx/font_cp850.png
+#   make clean    -> limpa out/ e ficheiros gerados pelo rescomp
+#   make fullclean-> clean + remove data/*.bin e gfx/font_cp850.png
 #
-# O makefile.gen do SGDK compila automaticamente todos os .c em src/
-# (incluindo subdirectórios engine/, game/, screens/) e linka com
-# libmd.a. Output: out/rom.bin
-#
-# -DSGDK_GCC é definido automaticamente pelo makefile.gen — usar
-# em guards #ifndef SGDK_GCC apenas para declarações que conflitem
-# com genesis.h (ex: forward-declares de strlen com tipos errados).
-# As funções em compat.c NÃO usam esse guard.
+# SGDK deve apontar para o directorio raiz do SGDK 1.70.
+# O makefile.gen compila todos os .c em src/ automaticamente.
+# Output: out/rom.bin
 
-# Caminho para o SGDK 1.70 (ajustar conforme instalação local)
 ifndef SGDK
-    $(error Variável SGDK não definida. Ex: make SGDK=/opt/sgdk170)
+    $(error Variavel SGDK nao definida. Ex: make SGDK=/opt/sgdk170)
 endif
 
-# Pré-processamento de dados: gera teams.bin e coaches.bin
+PYTHON       := python3
+TOOLS_DIR    := tools
 ORIGINAL_DIR := original
 DATA_DIR     := data
-TOOLS_DIR    := tools
-PYTHON       := python3
+GFX_DIR      := gfx
 
 DATA_BIN := $(DATA_DIR)/teams.bin $(DATA_DIR)/coaches.bin
+FONT_PNG := $(GFX_DIR)/font_cp850.png
 
-.PHONY: all data clean fullclean
+.PHONY: all data font clean fullclean
 
-# Alvo padrão: garante dados gerados e invoca makefile.gen do SGDK
-all: data
+all: font data
 	$(MAKE) -f $(SGDK)/makefile.gen
 
-# Gera binários de dados a partir dos arquivos EF2 originais
+font: $(FONT_PNG)
+
+$(FONT_PNG):
+	@echo "Gerando fonte bitmap..."
+	$(PYTHON) $(TOOLS_DIR)/gen_font.py $(FONT_PNG)
+
 data: $(DATA_BIN)
 
 $(DATA_BIN): $(ORIGINAL_DIR)/EQUIPAS.EF2 $(ORIGINAL_DIR)/TREINAD.EF2 \
@@ -51,8 +51,8 @@ $(DATA_BIN): $(ORIGINAL_DIR)/EQUIPAS.EF2 $(ORIGINAL_DIR)/TREINAD.EF2 \
 
 clean:
 	$(MAKE) -f $(SGDK)/makefile.gen clean
-	@rm -f res/resources.h res/resources.s
+	@$(PYTHON) -c "import os; [os.remove(f) for f in ['res/resources.h','res/resources.s','res/resources.rs'] if os.path.exists(f)]"
 
 fullclean: clean
-	@rm -f $(DATA_BIN)
-	@echo "Limpeza completa concluída."
+	@$(PYTHON) -c "import os; [os.remove(f) for f in ['$(DATA_DIR)/teams.bin','$(DATA_DIR)/coaches.bin','$(FONT_PNG)'] if os.path.exists(f)]"
+	@echo "Limpeza completa concluida."

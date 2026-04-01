@@ -1,18 +1,18 @@
 /*
- * screens/finances.c — Finanças
+ * screens/finances.c -- Finan?as
  *
- * Sub-tela A — ORDENADOS:
- *   Lista jogadores com nome, posição, força, salário actual.
- *   O jogador pode alterar o salário de qualquer jogador.
- *   Se reduzir abaixo do mínimo → "Nem pensar!"
- *   Confirmação de aumento: [A]=Aceitar [B]=Recusar
+ * Sub-tela A -- ORDENADOS:
+ *   Lista jogadores com nome, posi??o, for?a, sal?rio actual.
+ *   O jogador pode alterar o sal?rio de qualquer jogador.
+ *   Se reduzir abaixo do m?nimo -> "Nem pensar!"
+ *   Confirma??o de aumento: [A]=Aceitar [B]=Recusar
  *
- * Sub-tela B — RECEITAS:
+ * Sub-tela B -- RECEITAS:
  *   Dinheiro actual, total de ordenados, saldo previsional.
  *
- * Sub-tela C — ESTADIO:
- *   Capacidade actual, preço dos bilhetes, custo de expansão.
- *   Construção de bancada: +5000 lugares por 50000 esc.
+ * Sub-tela C -- ESTADIO:
+ *   Capacidade actual, pre?o dos bilhetes, custo de expans?o.
+ *   Constru??o de bancada: +5000 lugares por 50000 esc.
  */
 
 #include <genesis.h>
@@ -59,7 +59,7 @@ static void screen_finances_salaries(void) {
                          "Novo ordenado p/ %-10s (min %ld):",
                          pl->name, min_sal);
 
-            /* Entrada numérica simples via D-pad (incrementa/decrementa) */
+            /* Entrada num?rica simples via D-pad (incrementa/decrementa) */
             new_sal = pl->salary;
             for (;;) {
                 SYS_doVBlankProcess();
@@ -73,7 +73,7 @@ static void screen_finances_salaries(void) {
                              new_sal);
                 if (input_pressed(BTN_CONFIRM)) {
                     if (new_sal < min_sal) {
-                        /* "Nem pensar!" — fiel ao original           */
+                        /* "Nem pensar!" -- fiel ao original           */
                         render_text(BG_A,
                             "  Nem pensar!                           ",
                             1u, (u16)(row_inp + 1u), PAL_MAIN);
@@ -102,7 +102,7 @@ static void screen_finances_salaries(void) {
         {
             u16 row = (u16)CONTENT_ROW_FIRST;
             render_textf(BG_A, 1u, row++, PAL_MAIN,
-                         "ORDENADOS — %-16s", team->name);
+                         "ORDENADOS -- %-16s", team->name);
             render_textf(BG_A, 1u, row++, PAL_MAIN,
                          "Total mensal: %ld  Disponivel: %ld",
                          team->salary_total, team->money);
@@ -130,7 +130,7 @@ static void screen_finances_salaries(void) {
                                  pl->name, s_pos_abbr[pl->pos],
                                  (u16)pl->strength, pl->salary, min);
                     if (pl->salary < min && pal != PAL_SELECTED) {
-                        /* Indica salário abaixo do mínimo            */
+                        /* Indica sal?rio abaixo do m?nimo            */
                         render_text(BG_A, "!", 39u, row, PAL_MAIN);
                     }
                     (void)sal_pal;
@@ -154,7 +154,7 @@ static void screen_finances_revenues(void) {
     row = (u16)CONTENT_ROW_FIRST;
 
     render_textf(BG_A, 1u, row++, PAL_MAIN,
-                 "FINANCAS — %-16s", team->name);
+                 "FINANCAS -- %-16s", team->name);
     render_hline(BG_A, 1u, row++, 38u, BOX_SIMPLE, PAL_MAIN);
 
     render_textf(BG_A, 2u, row++, PAL_MAIN,
@@ -191,7 +191,7 @@ static void screen_finances_revenues(void) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Sub-tela: Estádio                                                   */
+/* Sub-tela: Est?dio                                                   */
 /* ------------------------------------------------------------------ */
 
 #define STADIUM_EXPANSION_CAPACITY  5000u
@@ -222,7 +222,7 @@ static void screen_finances_stadium(void) {
             }
         }
 
-        /* Alterar preço bilhete (Up/Down)                            */
+        /* Alterar pre?o bilhete (Up/Down)                            */
         if (input_repeat(BTN_UP) && team->ticket_price < 50u) {
             team->ticket_price++;
             needs_redraw = 1u;
@@ -241,7 +241,7 @@ static void screen_finances_stadium(void) {
             u16 cap = team->stadium_cap;
 
             render_textf(BG_A, 1u, row++, PAL_MAIN,
-                         "ESTADIO — %-16s", team->name);
+                         "ESTADIO -- %-16s", team->name);
             render_hline(BG_A, 1u, row++, 38u, BOX_SIMPLE, PAL_MAIN);
 
             render_textf(BG_A, 2u, row++, PAL_MAIN,
@@ -275,7 +275,7 @@ static void screen_finances_stadium(void) {
 }
 
 /* ------------------------------------------------------------------ */
-/* screen_finances() — menu de tabs                                    */
+/* screen_finances() -- menu de tabs                                    */
 /* ------------------------------------------------------------------ */
 
 void screen_finances(void) {

@@ -4,23 +4,23 @@
 #include <genesis.h>
 
 /*
- * screens/squad.h — Gestão de plantel e formação
+ * screens/squad.h -- Gest?o de plantel e forma??o
  *
- * Tela principal de pré-jornada. Permite:
+ * Tela principal de pr?-jornada. Permite:
  *   - Ver plantel completo (11 titulares + banco)
  *   - Trocar jogador entre titular e banco
- *   - Mudar formação táctica (10 formações)
- *   - Auto-escalar (seleccionar os 11 melhores para a formação)
+ *   - Mudar forma??o t?ctica (10 forma??es)
+ *   - Auto-escalar (seleccionar os 11 melhores para a forma??o)
  *
- * Mapeamento de botões:
- *   D-pad ↑↓  Navegar jogadores
+ * Mapeamento de bot?es:
+ *   D-pad ??  Navegar jogadores
  *   A         Colocar em campo / tirar do campo (toggle)
  *   C         Auto-escalar (equivalente ao Alt+F3 original)
- *   Y         Mudar formação (cicla pelas 10 formações)
- *   B         Voltar ao menu pré-jornada
+ *   Y         Mudar forma??o (cicla pelas 10 forma??es)
+ *   B         Voltar ao menu pr?-jornada
  */
 
-/* Abre a tela de gestão do plantel da equipa do jogador.
+/* Abre a tela de gest?o do plantel da equipa do jogador.
  * Retorna quando o jogador pressiona B. */
 void screen_squad(void);
 

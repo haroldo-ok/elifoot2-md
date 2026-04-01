@@ -1,11 +1,11 @@
 /*
- * screens/palmares.c — PALMARES (últimas 5 temporadas)
+ * screens/palmares.c -- PALMARES (?ltimas 5 temporadas)
  *
- * Exibe o historial das últimas 5 temporadas com:
- *   - Campeão da Div1
- *   - Campeão da Copa (futuro)
- *   - Posição do jogador
- *   - Divisão do jogador
+ * Exibe o historial das ?ltimas 5 temporadas com:
+ *   - Campe?o da Div1
+ *   - Campe?o da Copa (futuro)
+ *   - Posi??o do jogador
+ *   - Divis?o do jogador
  *
  * Fiel ao original: "PALMARES" sem acento (encoding ASCII do Genesis).
  */
@@ -24,7 +24,7 @@ void screen_palmares(void) {
     render_clear_content();
     row = (u16)CONTENT_ROW_FIRST;
 
-    render_text(BG_A, "PALMARES — ULTIMAS TEMPORADAS",
+    render_text(BG_A, "PALMARES -- ULTIMAS TEMPORADAS",
                 5u, row++, PAL_MAIN);
     render_hline(BG_A, 1u, row++, 38u, BOX_DOUBLE, PAL_MAIN);
     render_text(BG_A, " Temp  Campeao Div1        Pos  Div",

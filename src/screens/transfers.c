@@ -1,19 +1,19 @@
 /*
- * screens/transfers.c — Venda e leilão de jogadores
+ * screens/transfers.c -- Venda e leil?o de jogadores
  *
  * Layout fiel ao original:
  *
  *   VENDA PELA MELHOR OFERTA DE ORDENADO
- *   ─────────────────────────────────────────
+ *   ?????????????????????????????????????????
  *    JOGADOR        | POS | FRC | EQUIPA     | PRECO
- *   ─────────────────────────────────────────────────
+ *   ?????????????????????????????????????????????????
  *    Zetti          |  GR |  85 | SAO PAULO  |  Venda
  *    Rogerio        |  GR |  72 | SAO PAULO  |  ...
  *
  *   ORDENADO MINIMO: 8500
  *   [A] Vender  [B] Voltar
  *
- * Após venda:
+ * Ap?s venda:
  *   TRANSFERIDO PARA O CORINTHIANS
  *   NOVO ORDENADO: 9200
  *
@@ -74,7 +74,7 @@ static void render_transfers(u8 team_idx, ListNav *nav) {
             render_text(BG_A, "v", 39u, (u16)(row - 1u), PAL_MAIN);
     }
 
-    /* Ordenado mínimo do jogador seleccionado                        */
+    /* Ordenado m?nimo do jogador seleccionado                        */
     {
         Player *sel_pl = &g_players[(u16)team->player_start + nav->selected];
         render_hline(BG_A, 1u, (u16)(CONTENT_ROW_LAST - 2u),
@@ -116,7 +116,7 @@ void screen_transfers(void) {
             u8   gk_cnt  = data_get_team_gk_count(g_player_team_idx);
             Player *pl   = &g_players[pi];
 
-            /* Verifica restrições de plantel                         */
+            /* Verifica restri??es de plantel                         */
             if (total <= (u8)MIN_SQUAD_SIZE) {
                 render_text(BG_A,
                     "Como so possui 14 jogadores na equipa.",
@@ -140,10 +140,10 @@ void screen_transfers(void) {
                 continue;
             }
 
-            /* Lança leilão                                            */
+            /* Lan?a leil?o                                            */
             winner = transfer_auction(pi, g_player_team_idx);
 
-            /* Exibe resultado — fiel ao original                     */
+            /* Exibe resultado -- fiel ao original                     */
             render_clear_content();
             render_text(BG_A, "VENDA PELA MELHOR OFERTA DE ORDENADO",
                         1u, (u16)CONTENT_ROW_FIRST, PAL_MAIN);
@@ -155,14 +155,14 @@ void screen_transfers(void) {
                              PAL_MAIN,
                              "TRANSFERIDO PARA O %s",
                              g_teams[winner].name);
-                /* O novo ordenado é o salário após a transferência   */
+                /* O novo ordenado ? o sal?rio ap?s a transfer?ncia   */
                 render_textf(BG_A, 2u, (u16)(CONTENT_ROW_FIRST + 4u),
                              PAL_MAIN,
                              "NOVO ORDENADO: %ld esc.",
                              g_players[pi].salary);
                 /* Sincroniza dinheiro                                */
                 g_money = team->money;
-                /* O array foi compactado — ajusta nav                */
+                /* O array foi compactado -- ajusta nav                */
                 if (nav.selected >= team->player_count && nav.selected > 0u)
                     nav.selected--;
                 nav.count = team->player_count;

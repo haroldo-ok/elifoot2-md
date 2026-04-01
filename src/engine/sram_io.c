@@ -1,16 +1,16 @@
 /*
- * engine/sram_io.c — Save/Load em SRAM para Elifoot II Genesis
+ * engine/sram_io.c -- Save/Load em SRAM para Elifoot II Genesis
  *
  * SGDK 1.70 caveats:
- *   - SRAM_readBuffer / SRAM_writeBuffer NÃO existem em SGDK 1.70.
+ *   - SRAM_readBuffer / SRAM_writeBuffer N?O existem em SGDK 1.70.
  *     Implementar como loop de SRAM_readByte / SRAM_writeByte.
  *   - SRAM_enable() ANTES e SRAM_disable() DEPOIS de qualquer acesso.
- *     Em hardware real, SRAM_disable() é obrigatório para proteger os dados.
- *   - u32 para o offset em SRAM_readByte/writeByte (endereço no espaço
- *     de memória do Mega Drive, não apenas posição no banco).
- *   - int = 16 bits: contadores de loop usam u16, não int.
+ *     Em hardware real, SRAM_disable() ? obrigat?rio para proteger os dados.
+ *   - u32 para o offset em SRAM_readByte/writeByte (endere?o no espa?o
+ *     de mem?ria do Mega Drive, n?o apenas posi??o no banco).
+ *   - int = 16 bits: contadores de loop usam u16, n?o int.
  *
- * Serialização big-endian (m68k native) para todos os campos multi-byte.
+ * Serializa??o big-endian (m68k native) para todos os campos multi-byte.
  */
 
 #include <genesis.h>
@@ -26,10 +26,10 @@
 #define SRAM_VERSION_OFFSET 0x0004UL
 #define SRAM_SLOT0_OFFSET   SRAM_SLOT_BASE
 
-/* Tamanho do conteúdo serializado de um slot (sem os 2 bytes de CRC) */
+/* Tamanho do conte?do serializado de um slot (sem os 2 bytes de CRC) */
 #define SLOT_CONTENT_SIZE   1822u
 
-/* Tamanho total do buffer de um slot (CRC + conteúdo)                */
+/* Tamanho total do buffer de um slot (CRC + conte?do)                */
 #define SLOT_BUFFER_SIZE    1824u
 
 /* Layout por equipa no slot: 14 bytes                                */
@@ -42,7 +42,7 @@
 #define PALMARES_SAVE_SIZE  4u
 
 /* ------------------------------------------------------------------ */
-/* I/O de baixo nível                                                  */
+/* I/O de baixo n?vel                                                  */
 /* ------------------------------------------------------------------ */
 
 static void sram_write_buf(u32 offset, const u8 *buf, u16 len) {
@@ -64,7 +64,7 @@ static void sram_read_buf(u32 offset, u8 *buf, u16 len) {
 }
 
 /* ------------------------------------------------------------------ */
-/* CRC-16/CCITT (polinómio 0x1021)                                    */
+/* CRC-16/CCITT (polin?mio 0x1021)                                    */
 /* ------------------------------------------------------------------ */
 
 static u16 crc16(const u8 *data, u16 len) {
@@ -81,7 +81,7 @@ static u16 crc16(const u8 *data, u16 len) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Helpers de serialização (big-endian)                               */
+/* Helpers de serializa??o (big-endian)                               */
 /* ------------------------------------------------------------------ */
 
 static u16 put_u8(u8 *buf, u16 pos, u8 val) {
@@ -137,13 +137,13 @@ void sram_init(void) {
         magic[1] == (u8)SRAM_MAGIC_1 &&
         magic[2] == (u8)SRAM_MAGIC_2 &&
         magic[3] == (u8)SRAM_MAGIC_3) {
-        /* Magic OK — verifica versão                                  */
+        /* Magic OK -- verifica vers?o                                  */
         sram_read_buf(SRAM_VERSION_OFFSET, magic, 2u);
         version = ((u16)magic[0] << 8) | (u16)magic[1];
         if (version == (u16)SRAM_SAVE_VERSION) return;
     }
 
-    /* SRAM virgem ou versão errada — inicializa cabeçalho             */
+    /* SRAM virgem ou vers?o errada -- inicializa cabe?alho             */
     {
         u8 hdr[6];
         hdr[0] = (u8)SRAM_MAGIC_0;
@@ -162,9 +162,9 @@ void sram_init(void) {
 
 u8 sram_save(u8 slot) {
     /*
-     * Buffer estático para o slot — 1824 bytes.
-     * Estático para não consumir stack do m68k (stack é limitado).
-     * ATENÇÃO: não é reentrante, mas save nunca é chamado de IRQ.
+     * Buffer est?tico para o slot -- 1824 bytes.
+     * Est?tico para n?o consumir stack do m68k (stack ? limitado).
+     * ATEN??O: n?o ? reentrante, mas save nunca ? chamado de IRQ.
      */
     static u8 buf[SLOT_BUFFER_SIZE];
     u16  pos = 2u;   /* primeiros 2 bytes = CRC (preenchido no fim)    */
@@ -175,13 +175,13 @@ u8 sram_save(u8 slot) {
     if ((u16)slot >= (u16)SAVE_SLOT_COUNT) return 0u;
     slot_offset = SRAM_SLOT0_OFFSET + (u32)slot * (u32)SRAM_SLOT_SIZE;
 
-    /* Cabeçalho do slot                                               */
+    /* Cabe?alho do slot                                               */
     pos = put_u8(buf, pos, g_season_num);
     pos = put_u8(buf, pos, g_round);
     pos = put_u8(buf, pos, g_player_team_idx);
     pos = put_u8(buf, pos, g_cup_phase);
 
-    /* 29 equipas × 14 bytes                                           */
+    /* 29 equipas ? 14 bytes                                           */
     for (t = 0u; t < (u8)TEAM_COUNT; t++) {
         Team *team = &g_teams[t];
         pos = put_u8 (buf, pos, team->division);
@@ -195,7 +195,7 @@ u8 sram_save(u8 slot) {
         pos = put_u16(buf, pos, team->stadium_cap);
     }
 
-    /* 464 jogadores × 3 bytes: strength + salary_lo + salary_hi      */
+    /* 464 jogadores ? 3 bytes: strength + salary_lo + salary_hi      */
     /* Salary comprimido para 16 bits (max 65535 escudos)              */
     for (p = 0u; p < (u16)(TEAM_COUNT * PLAYERS_PER_TEAM); p++) {
         Player *pl  = &g_players[p];
@@ -204,7 +204,7 @@ u8 sram_save(u8 slot) {
         pos = put_u16(buf, pos, sal16);
     }
 
-    /* Palmares × 4 bytes                                              */
+    /* Palmares ? 4 bytes                                              */
     for (i = 0u; i < (u8)PALMARES_COUNT; i++) {
         pos = put_u8(buf, pos, g_palmares[i].season_num);
         pos = put_u8(buf, pos, g_palmares[i].div1_champion);
@@ -241,7 +241,7 @@ u8 sram_load(u8 slot) {
     calc_crc   = crc16(buf + 2u, (u16)(SLOT_BUFFER_SIZE - 2u));
     if (stored_crc != calc_crc) return 0u;
 
-    /* Cabeçalho                                                       */
+    /* Cabe?alho                                                       */
     pos = get_u8(buf, pos, &g_season_num);
     pos = get_u8(buf, pos, &g_round);
     pos = get_u8(buf, pos, &g_player_team_idx);

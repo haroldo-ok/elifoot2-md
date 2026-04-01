@@ -4,12 +4,12 @@
 #include <genesis.h>
 
 /*
- * screens/transfers.h — Venda e leilão de jogadores
+ * screens/transfers.h -- Venda e leil?o de jogadores
  *
  * VENDA PELA MELHOR OFERTA DE ORDENADO:
- *   Navegar jogadores → [A] colocar à venda.
+ *   Navegar jogadores -> [A] colocar ? venda.
  *   A IA das outras equipas faz ofertas.
- *   Mostra: TRANSFERIDO PARA [CLUBE] / NÃO HOUVE OFERTAS.
+ *   Mostra: TRANSFERIDO PARA [CLUBE] / N?O HOUVE OFERTAS.
  *
  * Fiel ao original: a tela usa strings exactos do Elifoot II.
  */
