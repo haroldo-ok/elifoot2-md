@@ -1,0 +1,198 @@
+/*
+ * screens/title.c — Tela de título e seleção de equipe
+ *
+ * Esta implementação serve dois propósitos:
+ *   1. Tela de título funcional para Fase 0 (seleção de equipe com ListNav).
+ *   2. Tela de teste de paleta integrada (activar com BTN_ACTION na entrada).
+ *
+ * A tela de teste de paleta valida visualmente as 16 cores CGA→Genesis
+ * antes de avançar para a Fase 1 — é a primeira coisa a verificar no emulador.
+ *
+ * Cores CGA usadas nesta tela (conforme design original):
+ *   Título "ELIFOOT II": amarelo (PAL0[3]) sobre preto
+ *   Lista de equipes: branco (PAL0[2]) sobre preto
+ *   Equipe selecionada: preto (PAL1[1]) sobre ciano (PAL1[0])
+ *   Instrução "[A] Selecionar": ciano brilhante (PAL0[4])
+ */
+
+#include <genesis.h>
+#include "title.h"
+#include "../game/data.h"
+#include "../game/types.h"
+#include "../engine/input.h"
+#include "../engine/render.h"
+
+/* ------------------------------------------------------------------ */
+/* Tela de teste de paleta                                             */
+/* ------------------------------------------------------------------ */
+
+/*
+ * render_palette_test() — Valida visualmente as cores CGA→Genesis.
+ *
+ * Mostra cada entrada das paletas PAL0 e PAL1 como bloco de texto
+ * colorido. Comparar com a tabela de referência em game/types.h e
+ * no plano de port Seção 4.2.
+ *
+ * Activar: pressionar BTN_ACTION (C) na tela de título.
+ * Sair: pressionar qualquer botão.
+ */
+static void render_palette_test(void) {
+    static const char * const pal0_labels[16] = {
+        "[0] Preto       ", "[1] Azul esc.   ",
+        "[2] Branco      ", "[3] Amarelo     ",
+        "[4] Ciano br.   ", "[5] Verde br.   ",
+        "[6] Vermelho br.", "[7] Cinza claro ",
+        "[8] Magenta     ", "[9] Ciano esc.  ",
+        "[A] Cinza esc.  ", "[B] Magenta br. ",
+        "[C] Marrom      ", "[D] Verde esc.  ",
+        "[E] Azul br.    ", "[F] Branco dup. ",
+    };
+
+    u8 i;
+
+    render_clear_content();
+    render_set_bg_color(0u);  /* fundo preto                           */
+
+    render_text(BG_A, "=== TESTE DE PALETA CGA -> GENESIS ===",
+                1u, CONTENT_ROW_FIRST, PAL_MAIN);
+
+    /* PAL0: cada entrada como texto sobre fundo preto.
+     * Como a fonte só tem 2 cores (0=bg, 1=fg), cada entrada de paleta
+     * é usada como paleta do tile — a cor do texto corresponde a PAL0[i].
+     * NOTA: só podemos mostrar a cor [2] de PAL0 com PAL_MAIN (branco),
+     * pois render_text() usa a paleta inteira. Esta tela usa PAL_MAIN e
+     * PAL_SELECTED para demonstrar os dois esquemas visuais principais.   */
+
+    render_text(BG_A, "PAL0 (fundo preto):",
+                2u, (u16)(CONTENT_ROW_FIRST + 2u), PAL_MAIN);
+
+    /* Mostra blocos de cor com PAL0 e PAL1 alternados para demonstrar
+     * a diferença visual. Na ROM real, cada bloco de texto aparece
+     * na cor definida pela paleta selecionada para aquele tile.         */
+    for (i = 0u; i < 8u; i++) {
+        u16 row = (u16)(CONTENT_ROW_FIRST + 4u + i);
+        render_text(BG_A, pal0_labels[i],     2u, row, PAL_MAIN);
+        render_text(BG_A, pal0_labels[i + 8u], 22u, row, PAL_MAIN);
+    }
+
+    render_text(BG_A, "PAL1 (fundo ciano):",
+                2u, (u16)(CONTENT_ROW_FIRST + 13u), PAL_MAIN);
+
+    /* Demonstra PAL1: texto preto sobre ciano (cursor de seleção)     */
+    render_text_pad(BG_A, "  Item selecionado  ",
+                    2u, (u16)(CONTENT_ROW_FIRST + 15u), 20u, PAL_SELECTED);
+    render_text_pad(BG_A, "  Status bar        ",
+                    2u, (u16)(CONTENT_ROW_FIRST + 16u), 20u, PAL_SELECTED);
+
+    render_text(BG_A, "Pressione qualquer botao para voltar",
+                2u, (u16)(CONTENT_ROW_FIRST + 19u), PAL_MAIN);
+
+    render_help_bar("[Qualquer] Voltar ao menu", (const char *)0);
+}
+
+/* ------------------------------------------------------------------ */
+/* screen_title()                                                      */
+/* ------------------------------------------------------------------ */
+
+void screen_title(void) {
+    ListNav nav;
+    u8 needs_redraw = 1u;
+    u8 in_palette_test = 0u;
+    u16 i;
+
+    list_nav_init(&nav, (u8)TEAM_COUNT, (u8)18u);  /* 18 linhas visíveis */
+
+    render_set_bg_color(1u);   /* fundo azul escuro (CGA cor 1)        */
+    render_clear_content();
+
+    for (;;) {
+        /* ---- Input ---- */
+        SYS_doVBlankProcess();
+        input_update();
+
+        if (in_palette_test) {
+            if (input_any_pressed()) {
+                in_palette_test = 0u;
+                needs_redraw = 1u;
+                render_set_bg_color(1u);
+            }
+            continue;
+        }
+
+        /* BTN_ACTION (C) → tela de teste de paleta                   */
+        if (input_pressed(BTN_ACTION)) {
+            in_palette_test = 1u;
+            render_palette_test();
+            continue;
+        }
+
+        /* Confirmar seleção                                           */
+        if (input_pressed(BTN_CONFIRM)) {
+            g_player_team_idx = nav.selected;
+            g_division        = g_teams[nav.selected].division;
+            g_money           = g_teams[nav.selected].money;
+            return;
+        }
+
+        /* Navega lista                                                */
+        if (list_nav_update(&nav)) {
+            needs_redraw = 1u;
+        }
+
+        /* ---- Render (só quando necessário) ---- */
+        if (!needs_redraw) continue;
+        needs_redraw = 0u;
+
+        render_clear_content();
+
+        /* Título: amarelo sobre fundo azul escuro                    */
+        render_text(BG_A, "ELIFOOT II",
+                    15u, (u16)(CONTENT_ROW_FIRST + 1u), PAL_MAIN);
+        render_text(BG_A, "Selecione a sua equipa:",
+                    9u, (u16)(CONTENT_ROW_FIRST + 3u), PAL_MAIN);
+
+        /* Separador                                                   */
+        render_hline(BG_A, 1u, (u16)(CONTENT_ROW_FIRST + 4u),
+                     38u, BOX_SIMPLE, PAL_MAIN);
+
+        /* Lista de equipes com scroll                                 */
+        for (i = 0u; i < nav.page_size; i++) {
+            u16 team_idx = (u16)(nav.page_top + i);
+            u16 row = (u16)(CONTENT_ROW_FIRST + 5u + i);
+
+            if (team_idx >= (u16)TEAM_COUNT) break;
+
+            /* Linha selecionada: ciano (PAL1), resto: branco (PAL0)   */
+            if (team_idx == (u16)nav.selected) {
+                /* Preenche linha inteira com ciano e escreve texto    */
+                render_fill_rect(BG_A, 1u, row, 38u, 1u,
+                                 PAL_SELECTED, 0u);
+                render_textf(BG_A, 3u, row, PAL_SELECTED,
+                             "%2u. %s",
+                             team_idx + 1u,
+                             g_teams[team_idx].name);
+            } else {
+                render_clear_rect(BG_A, 1u, row, 38u, 1u);
+                render_textf(BG_A, 3u, row, PAL_MAIN,
+                             "%2u. %s",
+                             team_idx + 1u,
+                             g_teams[team_idx].name);
+            }
+        }
+
+        /* Indicador de scroll                                         */
+        if (nav.page_top > 0u) {
+            render_text(BG_A, "^", 39u,
+                        (u16)(CONTENT_ROW_FIRST + 5u), PAL_MAIN);
+        }
+        if ((u16)(nav.page_top + nav.page_size) < (u16)TEAM_COUNT) {
+            render_text(BG_A, "v", 39u,
+                        (u16)(CONTENT_ROW_FIRST + 5u + nav.page_size - 1u),
+                        PAL_MAIN);
+        }
+
+        /* Help bar contextual                                         */
+        render_help_bar("[A]Selecionar  [C]Teste de cores  [^v]Navegar",
+                        (const char *)0);
+    }
+}
