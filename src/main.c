@@ -10,7 +10,7 @@
  *   5. data_init()   -> descompacta ROM -> RAM (equipes, jogadores, treinadores).
  *
  * Assinatura de main():
- *   u16 main(u16 hardReset)
+ *   int main(int hardReset)
  *   SGDK 1.70 / sys.c espera exatamente esta assinatura.
  *   Usar 'int' aqui causaria LTO type mismatch (int=16bit mas a
  *   declara??o em sys.c usa u16 -- conflito reportado como "type of
@@ -38,17 +38,12 @@
 /* ------------------------------------------------------------------ */
 /* Declaradas extern aqui para uso em render_status_bar().            */
 /* Definidas com valores iniciais em game/data.c.                     */
-u8   g_season_num      = 1u;
-u8   g_round           = 0u;
-u8   g_player_team_idx = 0u;
-u8   g_division        = 0u;
-long g_money           = 0L;
 
 /* ------------------------------------------------------------------ */
 /* main()                                                              */
 /* ------------------------------------------------------------------ */
 
-u16 main(u16 hardReset) {
+int main(int hardReset) {
     /* Suprime warning de par?metro n?o usado -- hardReset ? fornecido  */
     /* pelo SGDK mas n?o ? necess?rio no loop principal.               */
     (void)hardReset;
@@ -92,5 +87,5 @@ u16 main(u16 hardReset) {
 
     /* O loop while(TRUE) nunca termina, mas o compilador pode         */
     /* reclamar de missing return -- retornamos 0 por conformidade.     */
-    return 0u;
+    return 0;
 }

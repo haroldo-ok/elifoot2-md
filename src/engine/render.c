@@ -171,7 +171,7 @@ void render_textf(VDPPlane plane, u16 x, u16 y, u16 pal_idx,
     char buf[64];
     va_list args;
     va_start(args, fmt);
-    vsprintf(buf, fmt, args);
+    (void)vsprintf(buf, fmt, args);
     va_end(args);
     buf[63] = '\0';  /* garantia de NUL-termination                    */
     render_text(plane, buf, x, y, pal_idx);
