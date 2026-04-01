@@ -96,7 +96,7 @@ static u16 pal3_data[16];
  */
 #define write_tile(plane, tile_idx, pal, prio, cx, cy) \
     VDP_setTileMapXY((plane), \
-        TILE_ATTR((tile_idx), (pal), (prio)), \
+        ELF_TILE((tile_idx), (pal), (prio)), \
         (cx), (cy))
 
 /* ------------------------------------------------------------------ */
@@ -275,7 +275,7 @@ void render_clear_rect(VDPPlane plane, u16 x, u16 y, u16 w, u16 h) {
 void render_fill_rect(VDPPlane plane, u16 x, u16 y, u16 w, u16 h,
                       u16 pal_idx, u16 tile_idx) {
     /* VDP_fillTileMapRect() existe no SGDK 1.70 -- usa DMA interno.   */
-    VDP_fillTileMapRect(plane, TILE_ATTR(tile_idx, pal_idx, 0), x, y, w, h);
+    VDP_fillTileMapRect(plane, ELF_TILE(tile_idx, pal_idx, 0), x, y, w, h);
 }
 
 /* ------------------------------------------------------------------ */

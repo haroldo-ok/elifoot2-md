@@ -70,7 +70,7 @@ u16 main(u16 hardReset) {
     /* GET_VCOUNTER() l? o contador de varredura vertical do VDP.     */
     /* O valor varia com o momento exato em que o console ? ligado,   */
     /* criando variabilidade natural entre partidas.                   */
-    rng_init((u16)GET_VCOUNTER());
+    rng_init((u16)GET_VCOUNTER);
 
     /* ---- 5. DADOS (ROM -> RAM) ------------------------------------ */
     data_init();

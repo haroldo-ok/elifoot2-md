@@ -48,13 +48,13 @@
 #define CHAR_TO_TILE(c)  (FONT_BASE_TILE + (u16)((u8)(c) - 32u))
 
 /*
- * Monta tile attribute word.
- *   tile:  ?ndice do tile em VRAM (0-2047)
- *   pal:   ?ndice de paleta (PAL0=0 .. PAL3=3)
- *   prio:  prioridade (0=baixa, 1=alta)
+ * Tile attribute word -- uses SGDK TILE_ATTR_FULL from vdp_tile.h.
+ * SGDK already defines TILE_ATTR(pal,prio,flipV,flipH) in vdp_tile.h;
+ * we use ELF_TILE as our wrapper to avoid the redefinition conflict.
+ *   ELF_TILE(tile_index, pal, prio)
  */
-#define TILE_ATTR(tile, pal, prio) \
-    ( (u16)(((u16)(prio) << 15) | ((u16)(pal) << 13) | ((u16)(tile) & 0x07FFu)) )
+#define ELF_TILE(tile, pal, prio) \
+    TILE_ATTR_FULL((pal), (prio), 0, 0, (tile))
 
 /* ------------------------------------------------------------------ */
 /* ?ndices de paleta                                                   */
