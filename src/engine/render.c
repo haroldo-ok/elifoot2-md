@@ -13,7 +13,6 @@
  */
 
 #include <genesis.h>
-#include <stdarg.h>
 #include "render.h"
 
 /* Declara??o externa da estrutura de game state m?nima necess?ria
