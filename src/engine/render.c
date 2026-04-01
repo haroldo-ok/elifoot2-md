@@ -103,6 +103,7 @@ static u16 pal3_data[16];
 /* ------------------------------------------------------------------ */
 
 void render_init(void) {
+    KLog("render_init: START");
     /* Inicializa PAL2/PAL3 como c?pias de PAL0.                       */
     u16 i;
     for (i = 0; i < 16; i++) {
@@ -118,7 +119,9 @@ void render_init(void) {
 
     /* Carrega fonte na VRAM a partir do tile FONT_BASE_TILE.           */
     /* font_tiles ? definida em res/resources.h pelo rescomp.           */
+    KLog_U1("render_init: loading font at tile", (u32)FONT_BASE_TILE);
     VDP_loadTileSet(&font_tiles, FONT_BASE_TILE, DMA);
+    KLog_U1("render_init: font numTile=", (u32)font_tiles.numTile);
 
     /* Configura o WINDOW plane para aparecer sobre BG_A.              */
     /* Posi??o do WINDOW: cobre linhas 0-2 (topo) e 25-27 (rodap?).   */

@@ -95,15 +95,20 @@ static void render_palette_test(void) {
 /* ------------------------------------------------------------------ */
 
 void screen_title(void) {
+    KLog("screen_title: START");
     ListNav nav;
     u8 needs_redraw = 1u;
     u8 in_palette_test = 0u;
     u16 i;
 
+    KLog_U1("screen_title: TEAM_COUNT=", (u32)TEAM_COUNT);
     list_nav_init(&nav, (u8)TEAM_COUNT, (u8)18u);  /* 18 linhas vis?veis */
 
+    KLog("screen_title: calling render_set_bg_color");
     render_set_bg_color(1u);   /* fundo azul escuro (CGA cor 1)        */
+    KLog("screen_title: calling render_clear_content");
     render_clear_content();
+    KLog("screen_title: entering main loop");
 
     for (;;) {
         /* ---- Input ---- */
@@ -114,7 +119,8 @@ void screen_title(void) {
             if (input_any_pressed()) {
                 in_palette_test = 0u;
                 needs_redraw = 1u;
-                render_set_bg_color(1u);
+                KLog("screen_title: calling render_set_bg_color");
+    render_set_bg_color(1u);
             }
             continue;
         }
