@@ -198,6 +198,7 @@ void data_init(void) {
     g_season_num      = 1u;
     g_round           = 1u;
     g_player_team_idx = 0u;
+    g_round           = 1u;
     g_division        = g_teams[0].division;
     g_money           = g_teams[0].money;
     g_results_count   = 0u;

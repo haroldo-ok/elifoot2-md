@@ -22,6 +22,10 @@ int main(int hardReset) {
 
     /* Seleccao de equipa */
     g_player_team_idx = screen_title();
+    /* Update game state for chosen team */
+    g_division = g_teams[g_player_team_idx].division;
+    g_money    = g_teams[g_player_team_idx].money;
+    g_round    = 1u;
 
     /* Loop principal do jogo */
     for (;;) {

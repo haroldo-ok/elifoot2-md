@@ -107,36 +107,62 @@ static void ui_num(u16 x, u16 y, u16 pal, u16 val, u16 width) {
 
 /* ------------------------------------------------------------------ */
 void ui_printf(u16 x, u16 y, u16 pal, const char *fmt, ...) {
-    /* Simple hand-rolled formatter: supports %u, %s, %2u etc.
-     * Avoids vsprintf which is unreliable on m68k with -fno-builtin. */
     va_list ap;
     u16 cx = x;
     const char *p = fmt;
     va_start(ap, fmt);
     while (*p && cx < UI_COLS) {
-        if (*p != '%') {
-            ui_putc(cx++, y, pal, *p++);
-            continue;
-        }
+        if (*p != '%') { ui_putc(cx++, y, pal, *p++); continue; }
         p++; /* skip '%' */
-        /* parse optional width digit */
+        /* flags */
+        u8 left = 0u;
+        if (*p == '-') { left = 1u; p++; }
+        /* width */
         u16 width = 0u;
         while (*p >= '0' && *p <= '9') {
             width = (u16)(width * 10u + (u16)(*p - '0'));
             p++;
         }
+        /* long modifier */
+        u8 is_long = 0u;
+        if (*p == 'l') { is_long = 1u; p++; }
+
         if (*p == 'u' || *p == 'd') {
-            u16 val = (u16)__builtin_va_arg(ap, unsigned int);
-            char tmp[8]; u8 i = 7u; tmp[7] = '\0';
-            if (val == 0u) { tmp[--i] = '0'; }
-            else { while (val) { tmp[--i] = (char)('0' + val % 10u); val /= 10u; } }
-            while ((u8)(7u - i) < (u8)width) { tmp[--i] = ' '; }
-            { const char *q = tmp + i; while (*q && cx < UI_COLS) ui_putc(cx++, y, pal, *q++); }
+            char tmp[12]; u8 i = 11u; tmp[11] = '\0';
+            if (is_long) {
+                long lv = __builtin_va_arg(ap, long);
+                u8 neg = 0u;
+                unsigned long uv;
+                if (*p == 'd' && lv < 0) { neg = 1u; uv = (unsigned long)(-lv); }
+                else { uv = (unsigned long)lv; }
+                if (uv == 0u) { tmp[--i] = '0'; }
+                else { while (uv) { tmp[--i] = (char)('0' + (u8)(uv % 10u)); uv /= 10u; } }
+                if (neg) tmp[--i] = '-';
+            } else {
+                u16 val = (u16)(unsigned long)__builtin_va_arg(ap, unsigned long);
+                if (val == 0u) { tmp[--i] = '0'; }
+                else { while (val) { tmp[--i] = (char)('0' + val % 10u); val /= 10u; } }
+            }
+            { /* pad and print */
+                u8 len = (u8)(11u - i);
+                if (!left) { while (len < (u8)width && cx < UI_COLS) { ui_putc(cx++, y, pal, ' '); len++; } }
+                { const char *q = tmp + i; while (*q && cx < UI_COLS) ui_putc(cx++, y, pal, *q++); }
+                if (left) { while (len < (u8)width && cx < UI_COLS) { ui_putc(cx++, y, pal, ' '); len++; } }
+            }
             p++;
         } else if (*p == 's') {
             const char *s = __builtin_va_arg(ap, const char *);
+            u8 len = 0u;
+            const char *q;
             if (!s) s = "";
-            while (*s && cx < UI_COLS) ui_putc(cx++, y, pal, *s++);
+            if (!left) {
+                q = s; while (*q) { len++; q++; }
+                while (len < (u8)width && cx < UI_COLS) { ui_putc(cx++, y, pal, ' '); len++; }
+                len = 0u;
+            }
+            q = s;
+            while (*q && cx < UI_COLS) { ui_putc(cx++, y, pal, *q++); len++; }
+            if (left) { while (len < (u8)width && cx < UI_COLS) { ui_putc(cx++, y, pal, ' '); len++; } }
             p++;
         } else {
             ui_putc(cx++, y, pal, '%');
