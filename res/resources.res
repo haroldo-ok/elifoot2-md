@@ -20,5 +20,5 @@
 # teams.bin   : 11894 bytes (29 equipas x 464 jogadores)
 # coaches.bin : 1002 bytes  (50 treinadores)
 # ---------------------------------------------------------------------
-BIN teams_data   "../data/teams.bin"   2 2 0 FAST
-BIN coaches_data "../data/coaches.bin" 2 2 0 FAST
+BIN teams_data   "../data/teams.bin"   2 2 0 0
+BIN coaches_data "../data/coaches.bin" 2 2 0 0
