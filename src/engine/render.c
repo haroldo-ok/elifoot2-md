@@ -6,7 +6,7 @@
  *   - VDP_loadTileSet() usa DMA -- n?o chamar dentro de VBlank.
  *   - VDP_setTileMapXY() escreve diretamente no tilemap -- nenhuma
  *     chamada a SYS_doVBlankProcess() dentro de loops de render.
- *   - VDP_clearPlane(WINDOW, TRUE) ? obrigat?rio ao trocar de tela
+ *   - VDP_clearTileMapRect(WINDOW, 0, 0, 40, 28) ? obrigat?rio ao trocar de tela
  *     para evitar res?duos de texto.
  *   - PAL_setColors() com DMA em vez de PAL_setPalette() para arrays
  *     de u16 -- PAL_setPalette() espera estrutura Palette do SGDK.
@@ -26,7 +26,7 @@ extern long g_money;           /* dinheiro atual da equipe do jogador   */
 
 /* Forward-declared from res/resources.h (gerado pelo rescomp).
  * TILESET font_tiles -- carregada via resources.res */
-extern TileSet font_tiles;
+extern const TileSet font_tiles;
 
 /* ------------------------------------------------------------------ */
 /* Dados de paleta (formato Genesis: 0x0BGR, 9 bits por cor)           */
@@ -127,9 +127,9 @@ void render_init(void) {
     /* a tela -- renderizaremos nas coordenadas corretas diretamente.   */
 
     /* Limpa todos os planes.                                           */
-    VDP_clearPlane(BG_A,   TRUE);
-    VDP_clearPlane(BG_B,   TRUE);
-    VDP_clearPlane(WINDOW, TRUE);
+    VDP_clearTileMapRect(BG_A, 0, 0, 40, 28);
+    VDP_clearTileMapRect(BG_B, 0, 0, 40, 28);
+    VDP_clearTileMapRect(WINDOW, 0, 0, 40, 28);
 
     /* Configura BG_B como fundo s?lido preto (tile 0, PAL0[0]=preto). */
     /* render_set_bg_color(0) far? isso explicitamente quando chamado, */
@@ -444,7 +444,7 @@ void render_help_bar(const char *line1, const char *line2) {
 
 void render_clear_content(void) {
     /*
-     * CR?TICO: VDP_clearPlane(WINDOW, TRUE) ? obrigat?rio ao trocar
+     * CR?TICO: VDP_clearTileMapRect(WINDOW, 0, 0, 40, 28) ? obrigat?rio ao trocar
      * de tela -- res?duos de texto no WINDOW persistem se n?o limpar.
      * Aqui limpamos apenas a ?rea de conte?do para preservar a
      * status bar j? renderizada.
@@ -452,8 +452,8 @@ void render_clear_content(void) {
      * Estrat?gia: limpar BG_A (conte?do principal) inteiro, e depois
      * redesenhar a status bar no WINDOW para garantir estado limpo.
      */
-    VDP_clearPlane(BG_A,   TRUE);
-    VDP_clearPlane(WINDOW, TRUE);
+    VDP_clearTileMapRect(BG_A, 0, 0, 40, 28);
+    VDP_clearTileMapRect(WINDOW, 0, 0, 40, 28);
 
     /* Redesenha barras fixas ap?s limpar o WINDOW.                    */
     render_status_bar();

@@ -30,10 +30,10 @@
 /* ------------------------------------------------------------------ */
 
 /* Tiles 1..96: ASCII chars 32 (space) at? 127 (DEL/~).               */
-#define FONT_BASE_TILE    1
+#define FONT_BASE_TILE    16   /* TILE_USERINDEX: user tiles start at 16 */
 
 /* Tiles 97..109: box-drawing CP437.                                   */
-#define BOX_BASE_TILE     97
+#define BOX_BASE_TILE     112  /* FONT_BASE_TILE(16) + ASCII_COUNT(96) */
 
 /* N?mero total de tiles de fonte carregados na VRAM.                  */
 #define FONT_TILE_COUNT   128
