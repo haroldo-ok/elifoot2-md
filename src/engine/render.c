@@ -142,7 +142,11 @@ void render_init(void) {
      * VDP_setWindowVPos(TRUE, 28) moves the WINDOW start to row 28
      * (below visible area), making BG_A fully visible for rows 0-27.
      * All UI text (status bar, help bar, content) goes directly on BG_A. */
-    VDP_setWindowVPos(TRUE, 28);
+    /* Disable WINDOW plane entirely by setting both H and V positions to 0.
+     * With FALSE and pos=0: window covers 0 rows = invisible.
+     * This ensures BG_A is fully visible for all 28 tile rows.       */
+    VDP_setWindowVPos(FALSE, 0);
+    VDP_setWindowHPos(FALSE, 0);
 }
 
 /* ------------------------------------------------------------------ */

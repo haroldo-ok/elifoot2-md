@@ -155,14 +155,8 @@ void screen_title(void) {
         render_clear_content();
         KLog("screen_title: render_clear_content done");
 
-        KLog("screen_title: rendering title text - calling render_text row 4");
-        /* TEST: write at rows 0,1,2,3,4 to find visibility boundary */
-        render_text(BG_A, "R0:ELIFOOT II", 0u, 0u, PAL_MAIN);
-        render_text(BG_A, "R1:ELIFOOT II", 0u, 1u, PAL_MAIN);
-        render_text(BG_A, "R2:ELIFOOT II", 0u, 2u, PAL_MAIN);
-        render_text(BG_A, "R3:ELIFOOT II", 0u, 3u, PAL_MAIN);
-        render_text(BG_A, "R4:ELIFOOT II", 0u, 4u, PAL_MAIN);
-        KLog_U1("screen_title: title written at row", (u32)(CONTENT_ROW_FIRST + 1u));
+        render_text(BG_A, "ELIFOOT II",
+                    15u, (u16)(CONTENT_ROW_FIRST + 1u), PAL_MAIN);
         render_text(BG_A, "Selecione a sua equipa:",
                     9u, (u16)(CONTENT_ROW_FIRST + 3u), PAL_MAIN);
 
