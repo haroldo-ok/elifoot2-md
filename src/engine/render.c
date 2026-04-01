@@ -36,10 +36,10 @@ extern const TileSet font_tiles;
 /* ------------------------------------------------------------------ */
 
 static const u16 pal0_data[16] = {
-    0x0000,  /* [0]  preto          -- background transparente padr?o    */
-    0x0600,  /* [1]  azul escuro    -- background alternativo (t?tulo)   */
-    0x0EEE,  /* [2]  branco         -- texto padr?o                      */
-    0x02EE,  /* [3]  amarelo        -- t?tulos, cabe?alhos               */
+    0x0600,  /* [0]  azul escuro    -- background principal (transparent) */
+    0x0EEE,  /* [1]  branco         -- texto padrao (pixel-1 dos tiles)  */
+    0x0000,  /* [2]  preto          -- sombra / borda escura             */
+    0x02EE,  /* [3]  amarelo        -- titulos, cabecalhos               */
     0x0EE2,  /* [4]  ciano brilhante-- subt?tulos, informa??es           */
     0x02E2,  /* [5]  verde brilhante-- valores positivos                 */
     0x022E,  /* [6]  vermelho br.   -- valores negativos                 */
