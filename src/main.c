@@ -17,10 +17,9 @@ int main(int hardReset) {
 
     ui_init();
     input_init();
-    rng_init();
+    rng_init(GET_VCOUNTER);
     data_init();
 
-    /* Mostra ecra de seleccao e fica com o indice escolhido. */
     g_player_team_idx = screen_title();
 
     /* TODO: avancar para o menu principal */
