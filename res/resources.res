@@ -13,7 +13,7 @@
 # Fonte de texto (TILESET)
 # Caminho relativo a res/ -> sobe para a raiz com ../
 # ---------------------------------------------------------------------
-TILESET font_tiles "../gfx/font_cp850.png" NONE NONE
+# TILESET font_tiles removed -- font loaded directly as C array in font_data.c
 
 # ---------------------------------------------------------------------
 # Dados binarios (BIN)

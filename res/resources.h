@@ -23,7 +23,6 @@
 #include <genesis.h>
 
 /* Font tileset loaded into VRAM at FONT_BASE_TILE (tile 1) */
-extern const TileSet font_tiles;
 
 /* Team + player data - 11894 bytes, big-endian binary */
 extern const u8 teams_data[];

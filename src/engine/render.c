@@ -13,6 +13,7 @@
  */
 
 #include <genesis.h>
+#include "font_data.h"
 #include "render.h"
 
 /* Declara??o externa da estrutura de game state m?nima necess?ria
@@ -26,7 +27,6 @@ extern long g_money;           /* dinheiro atual da equipe do jogador   */
 
 /* Forward-declared from res/resources.h (gerado pelo rescomp).
  * TILESET font_tiles -- carregada via resources.res */
-extern const TileSet font_tiles;
 
 /* ------------------------------------------------------------------ */
 /* Dados de paleta (formato Genesis: 0x0BGR, 9 bits por cor)           */
@@ -120,8 +120,11 @@ void render_init(void) {
     /* Carrega fonte na VRAM a partir do tile FONT_BASE_TILE.           */
     /* font_tiles ? definida em res/resources.h pelo rescomp.           */
     KLog_U1("render_init: loading font at tile", (u32)FONT_BASE_TILE);
-    VDP_loadTileSet(&font_tiles, FONT_BASE_TILE, DMA);
-    KLog_U1("render_init: font numTile=", (u32)font_tiles.numTile);
+    KLog("render_init: font = 109 tiles (hardcoded C array)");
+    /* Load font tile data directly as Genesis 4bpp u32 array.
+     * Bypasses rescomp PNG->4bpp conversion which caused nibble issues.
+     * VDP_loadTileData(data, first_tile, num_tiles, transfer_method) */
+    VDP_loadTileData(font_tile_data, FONT_BASE_TILE, 109, DMA);
 
     /* Configura o WINDOW plane para aparecer sobre BG_A.              */
     /* Posi??o do WINDOW: cobre linhas 0-2 (topo) e 25-27 (rodap?).   */
