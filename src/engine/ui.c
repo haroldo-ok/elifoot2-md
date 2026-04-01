@@ -36,7 +36,8 @@ typedef __builtin_va_list va_list;
 #define CHAR_TILE(c)  ((u16)(FONT_FIRST_TILE + (u16)((u8)(c) - 32u)))
 
 /* Atributo de tile: palette, prioridade 0, sem flip, indice.         */
-#define TILE_ATTR(pal, tile)  TILE_ATTR_FULL((pal), 0, 0, 0, (tile))
+/* flipH=TRUE compensates for SGDK VDP_loadTileData word-order storage */
+#define TILE_ATTR(pal, tile)  TILE_ATTR_FULL((pal), 0, FALSE, TRUE, (tile))
 
 /* ------------------------------------------------------------------
  * Dados de paleta
