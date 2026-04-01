@@ -115,7 +115,18 @@ void ui_init(void) {
         u16 _attr = TILE_ATTR(PAL0, TILE_SPACE);
         for (_r = 0u; _r < UI_ROWS; _r++)
             for (_c = 0u; _c < UI_COLS; _c++)
-                VDP_setTileMapXY(BG_A, _attr, _c, _r);
+                VDP_setTileMapXY(BG_B, _attr, _c, _r);
+    }
+    /* DIAGNOSTIC: write visible tile directly after clear.
+     * PAL1[0]=teal(0x0660), PAL1[1]=black(0x0000).
+     * If (0,0) shows teal+black, VDP writes work.
+     * If (0,0) is pure blue, the tilemap writes are invisible. */
+    {
+        u16 tile_X = (u16)(FONT_FIRST_TILE + (u16)('X' - 32u));
+        VDP_setTileMapXY(BG_B,
+            TILE_ATTR_FULL(PAL1, 0, FALSE, FALSE, tile_X),
+            0u, 0u);
+        KLog_U1("ui_init: wrote X tile idx=", (u32)tile_X);
     }
     KLog("ui_init: DONE");
 }
@@ -131,7 +142,7 @@ void ui_clear(void) {
     u16 _attr = TILE_ATTR(PAL0, TILE_SPACE);
     for (_r = 0u; _r < UI_ROWS; _r++)
         for (_c = 0u; _c < UI_COLS; _c++)
-            VDP_setTileMapXY(BG_A, _attr, _c, _r);
+            VDP_setTileMapXY(BG_B, _attr, _c, _r);
     KLog("ui_clear: DONE");
 }
 
@@ -144,7 +155,7 @@ void ui_putc(u16 x, u16 y, u16 pal, char c) {
     if (x >= UI_COLS || y >= UI_ROWS) return;
     if ((u8)c < 32u || (u8)c > 127u) c = ' ';
     tile = CHAR_TILE(c);
-    VDP_setTileMapXY(BG_A, TILE_ATTR(pal, tile), x, y);
+    VDP_setTileMapXY(BG_B, TILE_ATTR(pal, tile), x, y);
 }
 
 /* ------------------------------------------------------------------
@@ -158,7 +169,7 @@ void ui_puts(u16 x, u16 y, u16 pal, const char *str) {
     while (*p != '\0' && cx < UI_COLS) {
         c = (u8)*p++;
         if (c < 32u || c > 127u) c = 32u;
-        VDP_setTileMapXY(BG_A, TILE_ATTR(pal, CHAR_TILE((char)c)), cx, y);
+        VDP_setTileMapXY(BG_B, TILE_ATTR(pal, CHAR_TILE((char)c)), cx, y);
         cx++;
     }
 }
@@ -185,7 +196,7 @@ void ui_fill_row(u16 y, u16 pal) {
     u16 x;
     if (y >= UI_ROWS) return;
     for (x = 0u; x < UI_COLS; x++) {
-        VDP_setTileMapXY(BG_A, TILE_ATTR(pal, TILE_SPACE), x, y);
+        VDP_setTileMapXY(BG_B, TILE_ATTR(pal, TILE_SPACE), x, y);
     }
 }
 
@@ -200,7 +211,7 @@ void ui_hline(u16 x, u16 y, u16 len, u16 pal) {
     u16 end = (u16)(x + len);
     if (end > UI_COLS) end = UI_COLS;
     for (cx = x; cx < end; cx++) {
-        VDP_setTileMapXY(BG_A, TILE_ATTR(pal, CHAR_TILE('-')), cx, y);
+        VDP_setTileMapXY(BG_B, TILE_ATTR(pal, CHAR_TILE('-')), cx, y);
     }
 }
 
