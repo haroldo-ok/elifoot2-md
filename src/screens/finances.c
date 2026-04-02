@@ -7,6 +7,8 @@
 #include "../engine/ui.h"
 #include "../engine/input.h"
 #include "../game/data.h"
+#include "stadium.h"
+#include "alterar_ord.h"
 
 void screen_finances(void) {
     Team *team = &g_teams[g_player_team_idx];
@@ -30,12 +32,14 @@ void screen_finances(void) {
     ui_printf( 2u, 13u, UI_PAL_NORMAL, "Jornada:         %u", (u16)g_round);
 
     ui_hline(0u, 26u, UI_COLS, UI_PAL_NORMAL);
-    ui_puts(0u, 27u, UI_PAL_NORMAL, "B: voltar");
+    ui_puts(0u, 27u, UI_PAL_NORMAL, "C:estadio X:ordenados B:voltar");
 
-    /* Espera B para sair */
+    /* Espera B para sair ou C para estadio */
     for (;;) {
         ui_wait_vblank();
         input_update();
         if (input_pressed(BTN_CANCEL) || input_pressed(BTN_START)) return;
+        if (input_pressed(BTN_ACTION)) { screen_stadium(); return; }
+        if (input_pressed(BUTTON_X)) { screen_alterar_ord(); return; }
     }
 }

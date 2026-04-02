@@ -7,7 +7,6 @@
 
 #include <genesis.h>
 /* stdarg via GCC builtins -- SGDK does not ship stdarg.h */
-int vsprintf(char *buf, const char *fmt, __builtin_va_list ap);
 #ifndef va_list
 typedef __builtin_va_list va_list;
 #define va_start(v,l)  __builtin_va_start(v,l)

@@ -104,6 +104,35 @@ MatchResult match_simulate(u8 home, u8 away) {
     g_teams[away].goals_for     += ag;
     g_teams[away].goals_against += hg;
 
+    /* Assign goals to random titulars (for artilharia/top scorer) */
+    {
+        u8  g, ti;
+        u16 pi;
+        /* Home goals */
+        for (g = 0u; g < hg; g++) {
+            /* Pick random on-field player from home team */
+            for (ti = 0u; ti < 20u; ti++) {
+                pi = (u16)(g_teams[home].player_start
+                    + rng_range((u16)g_teams[home].player_count));
+                if (g_players[pi].on_field) {
+                    g_goals[pi]++;
+                    break;
+                }
+            }
+        }
+        /* Away goals */
+        for (g = 0u; g < ag; g++) {
+            for (ti = 0u; ti < 20u; ti++) {
+                pi = (u16)(g_teams[away].player_start
+                    + rng_range((u16)g_teams[away].player_count));
+                if (g_players[pi].on_field) {
+                    g_goals[pi]++;
+                    break;
+                }
+            }
+        }
+    }
+
     if (hg > ag) {
         g_teams[home].wins++;
         g_teams[away].losses++;

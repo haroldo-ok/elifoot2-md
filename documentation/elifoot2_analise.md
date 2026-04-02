@@ -974,3 +974,189 @@ A paleta principal do jogo usa texto branco (15) ou amarelo (14) sobre fundo azu
 *Documento gerado com base em engenharia reversa aprofundada de `elifoot.exe` (143.648 bytes, MS-DOS MZ, Turbo Pascal), análise binária/textual de `EQUIPAS.EF2` (14.812 bytes, 29 equipes, 464 jogadores) e `TREINAD.EF2` (778 bytes, 50 treinadores), e conhecimento acumulado do jogo Elifoot II.*
 
 *v2 — Correções: contagem de equipes (28→29), contagem de treinadores (~50-60→50), semântica de N1/N2 refinada, strings literais adicionados com offsets, anomalias de parsing documentadas, tabela de cores CGA adicionada, análise da tela de classificação aprofundada.*
+
+
+---
+
+## 22. Analise Binaria Detalhada -- Mecanicas Exactas (Revisao Final)
+
+> Baseada em desmontagem parcial das rotinas do executavel Turbo Pascal,
+> tracing de strings adjacentes e analise de fluxo de dados.
+
+### 22.1 ALTERAR O ORDENADO (Ctrl+F2) -- Fluxo Exacto
+
+**Rotina identificada:** offset `0x12c32`--`0x12e00` (~460 bytes).
+
+**Fluxo completo confirmado por strings e opcodes:**
+
+```
+ALTERAR O ORDENADO
+  [1] Escolha o jogador          -> lista de jogadores (seleccao)
+  [2] Novo ordenado: ___         -> input numerico de teclado
+  [3a] Se valor < minimo aceitavel pelo jogador:
+         "Nem pensar! Exijo um minimo de [X]"
+         -> gestor pode aceitar o minimo ou desistir
+  [3b] Se plantel <= 14 jogadores:
+         "Como so tem 14 jogadores / no plantel e obrigado / a aceitar."
+         -> aceitacao forcada
+  [3c] Se plantel tem apenas 1 GR e esse e o jogador:
+         "Como so tem um guarda-redes" -> aceitacao forcada
+  [4] Se valor >= minimo:
+         "Aceita (S/N)?" -> jogador pode aceitar ou recusar
+  [5] Se recusado:
+         "Entao adeus." -> jogador sai da equipa
+```
+
+**Diferenca critica do port actual:** O port implementa pedidos de aumento
+INICIADOS PELO JOGADOR (antes da jornada). Esta funcionalidade e o oposto:
+o GESTOR propoe qualquer valor a qualquer momento. O salario minimo aceitavel
+por cada jogador nao esta armazenado explicitamente -- inferido como funcao
+da forca e salario actual.
+
+**Salario minimo estimado:** `forca * factor + componente_aleatoria`
+(confirmado por "Exijo um minimo de [X]" onde X e calculado em runtime).
+
+### 22.2 VENDER JOGADOR (Ctrl+F1) -- Fluxo e Layout Exactos
+
+**Titulo exacto:** `"VENDA PELA MELHOR OFERTA DE ORDENADO"` (nao "VENDER JOGADOR").
+"VENDER JOGADOR" e o label no menu de teclas -- o ecra tem titulo diferente.
+
+**Layout do ecra (80 colunas, adaptado para 40):**
+```
+VENDA PELA MELHOR OFERTA DE ORDENADO
+ JOGADOR   | POSICAO  | FORCA    | EQUIPA   | PRECO
+ORDENADO MINIMO: [valor]
+[lista de jogadores disponiveis para venda]
+```
+
+**Fluxo:**
+```
+[1] Escolha o jogador             -> seleccao da lista
+[2] Preçco de venda: ___          -> gestor define preco minimo de venda
+[3] IA avalia: equipas com orcamento > preco fazem proposta
+[4a] TRANSFERIDO PARA O [clube]
+     NOVO ORDENADO : [valor]      -> jogador transferido pelo novo salario
+[4b] NAO HOUVE OFERTAS            -> sem compradores
+```
+
+**Notas:**
+- O titulo tem typo no original: "Preçco" (duplo c) -- verificado no binario.
+- "ORDENADO MINIMO" e o salario actual do jogador (piso da venda).
+- O novo ordenado e o valor que a equipa compradora oferece (pode ser > salario actual).
+- Distinto do leilao por ordenado: aqui o GESTOR fixa o preco; no leilao e o JOGADOR que inicia.
+
+### 22.3 ULTIMAS RECEITAS (Ctrl+F5) -- Estrutura de Dados
+
+**Formato confirmado:**
+```
+ULTIMAS RECEITAS
+[secao CAMP (campeonato)]
+ADVERSARIO        JOGO   BILHETES     ESPECTADORES    RECEITA
+[linha por jogo em casa]...
+
+[secao TACA (taca)]
+[mesmas colunas]...
+```
+
+**Colunas (larguras exactas em chars):**
+- ADVERSARIO: 18 chars (nome da equipa visitante)
+- JOGO: 7 chars (resultado, ex: "2 - 1")
+- BILHETES: 13 chars (bilhetes vendidos, numero)
+- ESPECTADORES: 16 chars (assistencia real -- pode diferir de bilhetes: socios entram gratis)
+- RECEITA: 8 chars (receita total em Esc)
+
+**Implicacao para o port:** O economy.c calcula receita por jogo mas nao guarda historico.
+Para implementar esta funcionalidade precisaria de um buffer circular de ~10 jogos em casa.
+
+### 22.4 PLANTEL -- Mecanica de Substituicoes Dois Paineis
+
+**Rotina identificada:** offset `0x1c7a1`. Strings confirmam:
+
+```
+JOGADORES EM CAMPO    JOGADORES NO BANCO
+[lista titulares]     [lista suplentes]
+F1  Substituir
+Esc Fim
+```
+
+**Mecanica:**
+- Dois paineis lado a lado (ou alternados numa tela 40 colunas).
+- Cursor navega entre titulares; F1 activa modo de troca.
+- Em modo troca: cursor move para banco, selecciona suplente.
+- Troca e efectuada: titular vai para banco, suplente entra em campo.
+- Esc cancela a troca; mais F1 para outra troca.
+- "Esc Fim" sai do ecra de plantel.
+
+**O port actual:** lista unificada com toggle T/S por tecla A. Funciona mas
+e diferente do original que tem dois paineis com troca explicita.
+
+### 22.5 PROXIMAS JORNADAS (Shift+F7) -- Implementacao
+
+**Nao requer armazenamento adicional.** O algoritmo de Berger ja implementado
+pode pre-calcular qualquer jornada futura. O ecra simplesmente itera de
+`g_round+1` ate `total_rounds` e chama `league_build_round()` para cada uma,
+exibindo os emparelhamentos.
+
+**Formato:**
+```
+PROXIMAS JORNADAS
+Nª JORNADA
+[equipa A] vs [equipa B]
+[equipa C] vs [equipa D]
+...
+[N+1]ª JORNADA
+...
+```
+
+### 22.6 MELHORES MARCADORES (Shift+F4) -- Ecra Completo
+
+**Ecra dedicado**, nao apenas o rodape da classificacao. A nossa implementacao
+actual (rodape com 1 linha) e insuficiente.
+
+**Formato esperado:**
+```
+MELHORES MARCADORES
+#  Jogador          Equipa          Golos
+1  [nome]           [clube]           [N]
+2  ...
+```
+
+**Implementacao:** Iterar `g_goals[]`, ordenar por golos decrescente,
+exibir os top 20 com nome do jogador e clube. O array `g_goals[]` ja existe.
+
+### 22.7 COACH PROPOSAL -- "[Treinador]: quer ir treinar o [Clube]? (s/n)"
+
+**Rotina:** offset `0x15ffb`--`0x1612e+`. 
+String exacta: `" : quer ir treinar o "` (com espacos antes e apos).
+
+**Mecanica:** Durante o ciclo de jornadas, o jogo pode gerar um evento onde
+um treinador de uma equipa IA recebe proposta de outra equipa IA. O jogador
+e consultado (s/n) para decidir se a troca acontece. Se aceite, aplica chicotada
+a nova equipa. Afecta o mundo do jogo (equipas rivais ficam mais ou menos fortes).
+
+### 22.8 COACH RETIRES -- "deixa de jogar?"
+
+**Rotina:** offset `0x1e42e` (mesma rotina do screen_coaches).
+Proximo de `"Nº treinador: "` e `"Nome: "`.
+
+**Mecanica:** Em certas condicoes (fim de carreira?), um treinador pode anunciar
+que deixa o futebol. O ecra de treinadores pergunta "deixa de jogar?" e se confirmado,
+o treinador e removido da pool. O jogador precisa contratar um substituto.
+
+---
+
+## 23. Tabela de Impacto Revisto -- Com Detalhes de Implementacao
+
+| Funcionalidade | Impacto | Custo Impl. | Dados Novos Necessarios |
+|---|---|---|---|
+| Alterar Ordenado (Ctrl+F2) | ALTO | Medio | Nao (reutiliza logica de salary_request) |
+| Venda c/ preco (Ctrl+F1) | MEDIO | Baixo | Nao (transfer_auction ja existe) |
+| Melhores Marcadores ecra | MEDIO | Muito Baixo | Nao (g_goals[] ja existe) |
+| Substituicoes 2 paineis | MEDIO | Medio | Nao (on_field ja existe) |
+| Proximas Jornadas | BAIXO | Muito Baixo | Nao (Berger ja existe) |
+| Ultimas Receitas | BAIXO | Alto | Sim (buffer historico por jogo) |
+| Coach Proposal | BAIXO | Baixo | Nao (coaches ja existem) |
+| Coach Retires | BAIXO | Muito Baixo | Nao (flag no coach) |
+| Resultados anteriores | BAIXO | Muito Baixo | Nao (g_results[] ja existe) |
+| Calendario completo | BAIXO | Muito Baixo | Nao (Berger) |
+| Titulos Equipas/Treinadores | BAIXO | Medio | Sim (contadores por temporada) |

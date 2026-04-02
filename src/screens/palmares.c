@@ -1,63 +1,48 @@
 /*
- * screens/palmares.c -- PALMARES (?ltimas 5 temporadas)
- *
- * Exibe o historial das ?ltimas 5 temporadas com:
- *   - Campe?o da Div1
- *   - Campe?o da Copa (futuro)
- *   - Posi??o do jogador
- *   - Divis?o do jogador
- *
- * Fiel ao original: "PALMARES" sem acento (encoding ASCII do Genesis).
+ * screens/palmares.c -- Palmares (historial de temporadas)
  */
 
 #include <genesis.h>
 #include "palmares.h"
+#include "../engine/ui.h"
+#include "../engine/input.h"
 #include "../game/data.h"
 #include "../game/types.h"
-#include "../engine/input.h"
-#include "../engine/render.h"
 
 void screen_palmares(void) {
-    u16  row;
-    u8   i;
+    u8 i;
 
-    render_clear_content();
-    row = (u16)CONTENT_ROW_FIRST;
+    ui_clear();
+    ui_puts(14u, 0u, UI_PAL_NORMAL, "PALMARES");
+    ui_hline(0u, 1u, UI_COLS, UI_PAL_NORMAL);
+    ui_puts(0u, 2u, UI_PAL_NORMAL, "Temp  Div  Pos  Campeao Div1      Vencedor Taca");
+    ui_hline(0u, 3u, UI_COLS, UI_PAL_NORMAL);
 
-    render_text(BG_A, "PALMARES -- ULTIMAS TEMPORADAS",
-                5u, row++, PAL_MAIN);
-    render_hline(BG_A, 1u, row++, 38u, BOX_DOUBLE, PAL_MAIN);
-    render_text(BG_A, " Temp  Campeao Div1        Pos  Div",
-                1u, row++, PAL_MAIN);
-    render_hline(BG_A, 1u, row++, 38u, BOX_SIMPLE, PAL_MAIN);
-
-    for (i = 0u; i < (u8)PALMARES_COUNT; i++) {
-        SeasonRecord *rec = &g_palmares[i];
-
-        if (rec->season_num == 0u) {
-            render_text(BG_A, " ---  (sem dados)",
-                        1u, row, PAL_MAIN);
-        } else {
-            render_textf(BG_A, 1u, row, PAL_MAIN,
-                         "  %2u  %-18s %3u  Div%u",
-                         (u16)rec->season_num,
-                         g_teams[rec->div1_champion].name,
-                         (u16)rec->player_pos,
-                         (u16)(rec->player_div + 1u));
+    if (g_season_num <= 1u) {
+        ui_puts(8u, 12u, UI_PAL_NORMAL, "Sem historial ainda.");
+    } else {
+        for (i = 0u; i < (u8)PALMARES_COUNT; i++) {
+            SeasonRecord *sr = &g_palmares[i];
+            u16 row = (u16)(4u + i);
+            if (sr->season_num == 0u) break;
+            ui_printf(0u, row, UI_PAL_NORMAL,
+                      " %2u   Div%u  %2u   %-18s %-18s",
+                      (u16)sr->season_num,
+                      (u16)(sr->player_div + 1u),
+                      (u16)(sr->player_pos + 1u),
+                      sr->div1_champion < (u8)TEAM_COUNT
+                          ? g_teams[sr->div1_champion].name : "---",
+                      sr->cup_champion  < (u8)TEAM_COUNT
+                          ? g_teams[sr->cup_champion].name  : "---");
         }
-        row++;
     }
 
-    render_hline(BG_A, 1u, row++, 38u, BOX_SIMPLE, PAL_MAIN);
-    render_textf(BG_A, 1u, row, PAL_MAIN,
-                 "Temporada actual: %u  Divisao: Div%u",
-                 (u16)g_season_num, (u16)(g_division + 1u));
-
-    render_help_bar("[A/B] Voltar", NULL);
+    ui_hline(0u, 26u, UI_COLS, UI_PAL_NORMAL);
+    ui_puts(0u, 27u, UI_PAL_NORMAL, "B: voltar");
 
     for (;;) {
-        SYS_doVBlankProcess();
+        ui_wait_vblank();
         input_update();
-        if (input_pressed(BTN_CONFIRM) || input_pressed(BTN_CANCEL)) return;
+        if (input_pressed(BTN_CANCEL) || input_pressed(BTN_START)) return;
     }
 }
