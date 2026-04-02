@@ -145,7 +145,7 @@ static void venda_directa(u8 team_idx) {
             ui_hline(0u, 3u, UI_COLS, UI_PAL_NORMAL);
             ui_printf(0u, 4u, UI_PAL_NORMAL, "%-14s %2s      %2u     %s",
                       pl->name,
-                      s_pos_ao[pl->pos < 4u ? pl->pos : 0u],
+                      s_pos[pl->pos < 4u ? pl->pos : 0u],
                       (u16)pl->strength,
                       team->name);
             ui_printf(0u, 6u, UI_PAL_NORMAL, "ORDENADO MINIMO: %ld Esc", pl->salary);
@@ -197,7 +197,7 @@ static void venda_directa(u8 team_idx) {
                 if (i == sel) ui_fill_row(row, UI_PAL_SELECT);
                 ui_printf(0u, row, pal, "%2u %-14s %2s %3u %6ld",
                           (u16)(i+1u), pl->name,
-                          s_pos_ao[pl->pos < 4u ? pl->pos : 0u],
+                          s_pos[pl->pos < 4u ? pl->pos : 0u],
                           (u16)pl->strength, pl->salary);
             }
         }

@@ -19,7 +19,7 @@
 #include "../game/transfer.h"
 #include "../engine/rng.h"
 
-static const char s_pos_ao[4][3] = { "GR", "DF", "MD", "AV" };
+static const char s_pos_a[4][3] = { "GR", "DF", "MD", "AV" };
 
 /* Simple numeric input: returns entered value, or 0xFFFFFFFF if cancelled */
 static long read_number(u16 x, u16 y, u16 pal) {
@@ -104,7 +104,7 @@ void screen_alterar_ord(void) {
                     if (i == sel) ui_fill_row(row, UI_PAL_SELECT);
                     ui_printf(0u, row, pal, "%2u %-15s %2s  %ld",
                               (u16)(i+1u), pl->name,
-                              s_pos_ao[pl->pos < 4u ? pl->pos : 0u],
+                              s_pos_a[pl->pos < 4u ? pl->pos : 0u],
                               pl->salary);
                 }
             }
