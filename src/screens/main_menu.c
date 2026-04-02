@@ -1,5 +1,5 @@
 /*
- * screens/main_menu.c -- Menu principal (versao final)
+ * screens/main_menu.c -- Menu principal completo
  */
 
 #include <genesis.h>
@@ -8,39 +8,36 @@
 #include "../engine/input.h"
 #include "../game/data.h"
 
-typedef enum {
-    OPT_SQUAD      = 0,
-    OPT_FINANCES   = 1,
-    OPT_PLAY       = 2,
-    OPT_TRANSFERS  = 3,
-    OPT_COACHES    = 4,
-    OPT_CUP        = 5,
-    OPT_STANDINGS  = 6,
-    OPT_PALMARES   = 7,
-    OPT_SAVE       = 8,
-    OPT_COUNT      = 9
-} MenuOpt;
+/* Options -- split into two pages */
+#define OPT_COUNT 14u
 
 static const char * const s_labels[OPT_COUNT] = {
-    "Plantel",
-    "Financas",
-    "Jogar Jornada",
-    "Transferencias",
-    "Treinadores",
-    "Taca",
-    "Classificacao",
-    "Palmares",
-    "Guardar Jogo"
+    "Plantel",          /*  0 */
+    "Financas",         /*  1 */
+    "Jogar Jornada",    /*  2 */
+    "Transferencias",   /*  3 */
+    "Treinadores",      /*  4 */
+    "Taca",             /*  5 */
+    "Classificacao",    /*  6 */
+    "Palmares",         /*  7 */
+    "Guardar Jogo",     /*  8 */
+    "Marcadores",       /*  9 */
+    "Prox. Jornadas",   /* 10 */
+    "Resultados",       /* 11 */
+    "Calendario",       /* 12 */
+    "Ult. Transfer."     /* 13 */
 };
 
 static const u8 s_results[OPT_COUNT] = {
     MENU_RESULT_SQUAD, MENU_RESULT_FINANCES, MENU_RESULT_PLAY,
     MENU_RESULT_TRANSFERS, MENU_RESULT_COACHES, MENU_RESULT_CUP,
-    MENU_RESULT_STANDINGS, MENU_RESULT_PALMARES, MENU_RESULT_SAVE
+    MENU_RESULT_STANDINGS, MENU_RESULT_PALMARES, MENU_RESULT_SAVE,
+    MENU_RESULT_MARCADORES, MENU_RESULT_PROXIMAS,
+    MENU_RESULT_RESULTADOS, MENU_RESULT_CALENDARIO
 };
 
 u8 screen_main_menu(void) {
-    u8  sel    = OPT_PLAY;
+    u8  sel    = MENU_RESULT_PLAY;
     u8  redraw = 1u;
     u8  i;
 
@@ -64,14 +61,20 @@ u8 screen_main_menu(void) {
                   g_teams[g_player_team_idx].name,
                   (u16)g_round, (u16)(g_division + 1u));
         ui_hline(0u, 1u, UI_COLS, UI_PAL_NORMAL);
-        ui_puts(13u, 3u, UI_PAL_NORMAL, "MENU PRINCIPAL");
-        ui_hline(12u, 4u, 16u, UI_PAL_NORMAL);
 
         for (i = 0u; i < (u8)OPT_COUNT; i++) {
-            u16 row = (u16)(6u + i);
+            u16 col = (i < 9u) ? 13u : 1u;
+            u16 row = (i < 9u) ? (u16)(3u + i) : (u16)(3u + i - 9u);
             u16 pal = (i == sel) ? UI_PAL_SELECT : UI_PAL_NORMAL;
+            if (i == 9u) {
+                ui_hline(0u, 13u, UI_COLS, UI_PAL_NORMAL);
+                ui_puts(0u, 14u, UI_PAL_NORMAL, "INFO:");
+                row = (u16)(3u + i - 9u + 13u);
+                col = 6u;
+            }
+            if (i >= 9u) row = (u16)(3u + (i - 9u) + 2u + 13u);
             if (i == sel) ui_fill_row(row, UI_PAL_SELECT);
-            ui_puts(13u, row, pal, s_labels[i]);
+            ui_puts(col, row, pal, s_labels[i]);
         }
 
         ui_printf(0u, 24u, UI_PAL_NORMAL, "Dinheiro: %ld Esc", g_money);

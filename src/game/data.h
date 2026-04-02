@@ -46,6 +46,22 @@ extern long g_money;             /* dinheiro da equipe do jogador      */
 /* N?mero de resultados armazenados em g_results[] esta rodada.       */
 extern u8   g_results_count;
 
+/* Historico de transferencias (ultimas 20) */
+typedef struct {
+    char name[16];    /* nome do jogador */
+    u8   pos;         /* posicao */
+    u8   strength;    /* forca */
+    u8   from_team;   /* equipa origem */
+    u8   to_team;     /* equipa destino */
+    long salary;      /* novo ordenado */
+} TransferRecord;
+
+#define TRANSFER_HISTORY_SIZE 20u
+extern TransferRecord g_transfer_history[TRANSFER_HISTORY_SIZE];
+extern u8             g_transfer_count;
+void data_record_transfer(const char *name, u8 pos, u8 strength,
+                          u8 from_t, u8 to_t, long salary);
+
 /* Gols marcados por jogador na temporada corrente.
  * Indice = indice global em g_players[]. */
 extern u16  g_goals[TEAM_COUNT * PLAYERS_PER_TEAM];

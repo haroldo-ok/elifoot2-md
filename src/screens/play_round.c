@@ -256,6 +256,71 @@ static void salary_request(void) {
 }
 
 
+/* ------------------------------------------------------------------ */
+/* coach_proposal() -- evento: treinador IA quer ir treinar outro clube */
+/*                                                                     */
+/* "[nome]: quer ir treinar o [clube]? (s/n)"                         */
+/* Se aceite: treinador muda de equipa, aplica chicotada a nova equipa  */
+/* Afecta apenas equipas IA (nao a equipa do jogador)                  */
+/* ------------------------------------------------------------------ */
+static void coach_proposal(void) {
+    u8 from_team, to_team, coach_idx;
+    u8 tries = 0u;
+
+    /* 15% chance */
+    if (rng_range(100u) >= 15u) return;
+
+    /* Pick random AI source team */
+    do {
+        from_team = (u8)(rng_range((u8)TEAM_COUNT));
+        tries++;
+    } while (from_team == g_player_team_idx && tries < 20u);
+    if (from_team == g_player_team_idx) return;
+
+    /* Pick random AI target team different from source */
+    tries = 0u;
+    do {
+        to_team = (u8)(rng_range((u8)TEAM_COUNT));
+        tries++;
+    } while ((to_team == from_team || to_team == g_player_team_idx) && tries < 20u);
+    if (to_team == from_team || to_team == g_player_team_idx) return;
+
+    coach_idx = g_teams[from_team].coach_idx;
+
+    ui_clear();
+    ui_puts(8u, 0u, UI_PAL_NORMAL, "TREINADORES EM JOGO");
+    ui_hline(0u, 1u, UI_COLS, UI_PAL_NORMAL);
+    ui_printf(2u, 5u, UI_PAL_NORMAL, "%s :", g_coaches[coach_idx]);
+    ui_puts(2u, 6u, UI_PAL_NORMAL, "quer ir treinar o");
+    ui_printf(2u, 7u, UI_PAL_NORMAL, "%s ?", g_teams[to_team].name);
+    ui_hline(0u, 10u, UI_COLS, UI_PAL_NORMAL);
+    ui_puts(2u, 12u, UI_PAL_NORMAL, "Aceita esta mudanca?");
+    ui_hline(0u, 26u, UI_COLS, UI_PAL_NORMAL);
+    ui_puts(0u, 27u, UI_PAL_NORMAL, "A: Sim (aceitar)   B: Nao (recusar)");
+
+    for (;;) {
+        ui_wait_vblank();
+        input_update();
+        if (input_pressed(BTN_CONFIRM)) {
+            /* Coach moves: apply chicotada to new team */
+            g_teams[to_team].coach_idx   = coach_idx;
+            g_coach_boost_team           = to_team;
+            g_coach_boost_rounds         = (u8)COACH_BOOST_ROUNDS;
+            ui_clear();
+            ui_printf(4u, 10u, UI_PAL_NORMAL, "%s foi para %s.",
+                      g_coaches[coach_idx], g_teams[to_team].name);
+            ui_puts(4u, 12u, UI_PAL_NORMAL, "Chicotada psicologica!");
+            ui_hline(0u, 26u, UI_COLS, UI_PAL_NORMAL);
+            ui_puts(0u, 27u, UI_PAL_NORMAL, "A/B: continuar");
+            { u16 t; for(t=0u;t<120u;t++){ ui_wait_vblank(); input_update();
+                if(input_pressed(BTN_CONFIRM)||input_pressed(BTN_CANCEL)) break; } }
+            return;
+        }
+        if (input_pressed(BTN_CANCEL)) return;
+    }
+}
+
+
 void screen_play_round(void) {
     LeagueRound rnd;
     u8 total_rounds = league_total_rounds(g_division);
@@ -359,6 +424,9 @@ void screen_play_round(void) {
     ui_printf(8u, 12u, UI_PAL_NORMAL, "Simulando jornada %u...", (u16)g_round);
     ui_wait_vblank();
     ui_wait_vblank();
+
+    /* Coach proposal event */
+    coach_proposal();
 
     /* Salary request before round */
     salary_request();

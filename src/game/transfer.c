@@ -111,6 +111,8 @@ u8 transfer_player(u16 player_idx, u8 from_team, u8 to_team, long new_salary) {
 /* ------------------------------------------------------------------ */
 
 u8 transfer_auction(u16 player_idx, u8 current_team) {
+    /* Forward declaration for recording */
+    /* Recording done after successful transfer below */
     u8    winner_team = 0xFFu;
     long  best_offer  = 0L;
     long  min_sal;

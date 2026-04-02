@@ -95,6 +95,8 @@ Player       g_players[TEAM_COUNT * PLAYERS_PER_TEAM];
 Team         g_teams[TEAM_COUNT];
 char         g_coaches[COACH_COUNT][COACH_NAME_LEN];
 u16          g_goals[TEAM_COUNT * PLAYERS_PER_TEAM];
+TransferRecord g_transfer_history[TRANSFER_HISTORY_SIZE];
+u8             g_transfer_count = 0u;
 MatchResult  g_results[200];
 CupTie       g_cup_ties[16];
 SeasonRecord g_palmares[PALMARES_COUNT];
@@ -302,4 +304,28 @@ void data_sort_standings(u8 div, u8 *out_order, u8 *out_count) {
     }
     for (i = 0u; i < n; i++) out_order[i] = buf[i];
     *out_count = n;
+}
+
+/* ------------------------------------------------------------------ */
+void data_record_transfer(const char *name, u8 pos, u8 strength,
+                          u8 from_t, u8 to_t, long salary) {
+    TransferRecord *tr;
+    u8 i;
+    /* Shift history if full */
+    if (g_transfer_count >= (u8)TRANSFER_HISTORY_SIZE) {
+        for (i = 0u; i < (u8)(TRANSFER_HISTORY_SIZE - 1u); i++)
+            g_transfer_history[i] = g_transfer_history[i + 1u];
+        g_transfer_count = (u8)(TRANSFER_HISTORY_SIZE - 1u);
+    }
+    tr = &g_transfer_history[g_transfer_count++];
+    {
+        u8 j;
+        for (j = 0u; j < 15u && name[j]; j++) tr->name[j] = name[j];
+        tr->name[j] = '\0';
+    }
+    tr->pos       = pos;
+    tr->strength  = strength;
+    tr->from_team = from_t;
+    tr->to_team   = to_t;
+    tr->salary    = salary;
 }
