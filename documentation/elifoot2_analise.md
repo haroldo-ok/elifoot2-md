@@ -978,111 +978,185 @@ A paleta principal do jogo usa texto branco (15) ou amarelo (14) sobre fundo azu
 
 ---
 
-## 20. Segunda Analise Aprofundada -- Varredura Completa do Binario
+## 22. Analise Binaria Detalhada -- Mecanicas Exactas (Revisao Final)
 
-> Analise sistematica de TODOS os strings do executavel (8057 strings extraidas),
-> com identificacao de funcionalidades ainda nao documentadas.
+> Baseada em desmontagem parcial das rotinas do executavel Turbo Pascal,
+> tracing de strings adjacentes e analise de fluxo de dados.
 
-### 20.1 MELHORES MARCADORES -- Ecra Dedicado (Shift+F4)
+### 22.1 ALTERAR O ORDENADO (Ctrl+F2) -- Fluxo Exacto
 
-**Evidencia:** offset `0x10c7b`: `"MELHORES MARCADORES"` (titulo de ecra, nao apenas label de menu).
+**Rotina identificada:** offset `0x12c32`--`0x12e00` (~460 bytes).
 
-O ecra de artilheiros e um ecra completo separado, nao apenas uma linha na classificacao.
-Mostra todos os jogadores com golos marcados, em ordem decrescente.
-O port actual exibe apenas o artilheiro no rodape da classificacao -- falta o ecra completo.
+**Fluxo completo confirmado por strings e opcodes:**
 
-### 20.2 SUBSTITUICOES no Plantel (F1 Substituir)
+```
+ALTERAR O ORDENADO
+  [1] Escolha o jogador          -> lista de jogadores (seleccao)
+  [2] Novo ordenado: ___         -> input numerico de teclado
+  [3a] Se valor < minimo aceitavel pelo jogador:
+         "Nem pensar! Exijo um minimo de [X]"
+         -> gestor pode aceitar o minimo ou desistir
+  [3b] Se plantel <= 14 jogadores:
+         "Como so tem 14 jogadores / no plantel e obrigado / a aceitar."
+         -> aceitacao forcada
+  [3c] Se plantel tem apenas 1 GR e esse e o jogador:
+         "Como so tem um guarda-redes" -> aceitacao forcada
+  [4] Se valor >= minimo:
+         "Aceita (S/N)?" -> jogador pode aceitar ou recusar
+  [5] Se recusado:
+         "Entao adeus." -> jogador sai da equipa
+```
 
-**Evidencia:** offset `0x1c7ed`: `"F1  Substituir"` / `"Esc Fim"` imediatamente apos `"JOGADORES EM CAMPO"` / `"JOGADORES NO BANCO"`.
+**Diferenca critica do port actual:** O port implementa pedidos de aumento
+INICIADOS PELO JOGADOR (antes da jornada). Esta funcionalidade e o oposto:
+o GESTOR propoe qualquer valor a qualquer momento. O salario minimo aceitavel
+por cada jogador nao esta armazenado explicitamente -- inferido como funcao
+da forca e salario actual.
 
-O original tem dois modos de visualizacao do plantel:
-- **JOGADORES EM CAMPO** -- titulares
-- **JOGADORES NO BANCO** -- suplentes
+**Salario minimo estimado:** `forca * factor + componente_aleatoria`
+(confirmado por "Exijo um minimo de [X]" onde X e calculado em runtime).
 
-Com tecla F1 para fazer substituicoes entre os dois grupos. A logica e diferente
-do simples toggle que implementamos: e um mecanismo de TROCA entre titular e suplente
-especifico, provavelmente com confirmacao.
+### 22.2 VENDER JOGADOR (Ctrl+F1) -- Fluxo e Layout Exactos
 
-**String `"SUPLENTES"`** (offset `0x1dcc1`) confirma uma vista separada de suplentes.
+**Titulo exacto:** `"VENDA PELA MELHOR OFERTA DE ORDENADO"` (nao "VENDER JOGADOR").
+"VENDER JOGADOR" e o label no menu de teclas -- o ecra tem titulo diferente.
 
-### 20.3 PROPOSTA DE TREINADOR ENTRE EQUIPAS IA (Ctrl+F2 area)
+**Layout do ecra (80 colunas, adaptado para 40):**
+```
+VENDA PELA MELHOR OFERTA DE ORDENADO
+ JOGADOR   | POSICAO  | FORCA    | EQUIPA   | PRECO
+ORDENADO MINIMO: [valor]
+[lista de jogadores disponiveis para venda]
+```
 
-**Evidencia:** offset `0x1612e`: `" : quer ir treinar o "` seguido de `" (s/n) ?"`.
+**Fluxo:**
+```
+[1] Escolha o jogador             -> seleccao da lista
+[2] Preçco de venda: ___          -> gestor define preco minimo de venda
+[3] IA avalia: equipas com orcamento > preco fazem proposta
+[4a] TRANSFERIDO PARA O [clube]
+     NOVO ORDENADO : [valor]      -> jogador transferido pelo novo salario
+[4b] NAO HOUVE OFERTAS            -> sem compradores
+```
 
-Mecanismo de proposta de treinador entre equipas IA: um treinador de uma equipa IA
-pode querer ir treinar outra equipa IA, e o jogador e consultado (S/N).
-Esta e uma funcionalidade de gestao do mundo do jogo, nao apenas da equipa do jogador.
+**Notas:**
+- O titulo tem typo no original: "Preçco" (duplo c) -- verificado no binario.
+- "ORDENADO MINIMO" e o salario actual do jogador (piso da venda).
+- O novo ordenado e o valor que a equipa compradora oferece (pode ser > salario actual).
+- Distinto do leilao por ordenado: aqui o GESTOR fixa o preco; no leilao e o JOGADOR que inicia.
 
-**String `"Troca com"` (offset `0x164ab`)** e parte do mesmo sistema -- troca de treinadores
-entre clubes (chicotada com troca mutua vs contratacao unilateral).
+### 22.3 ULTIMAS RECEITAS (Ctrl+F5) -- Estrutura de Dados
 
-### 20.4 TREINADOR DEIXA DE JOGAR
+**Formato confirmado:**
+```
+ULTIMAS RECEITAS
+[secao CAMP (campeonato)]
+ADVERSARIO        JOGO   BILHETES     ESPECTADORES    RECEITA
+[linha por jogo em casa]...
 
-**Evidencia:** offset `0x1e4dd`: `"deixa de jogar? "` na area de gestao de treinadores,
-imediatamente apos `"Nº treinador: "`.
+[secao TACA (taca)]
+[mesmas colunas]...
+```
 
-Evento onde um treinador pode anunciar que quer deixar o futebol. Diferente de ser despedido
--- e uma saida voluntaria do treinador. O jogador provavelmente escolhe o substituto.
+**Colunas (larguras exactas em chars):**
+- ADVERSARIO: 18 chars (nome da equipa visitante)
+- JOGO: 7 chars (resultado, ex: "2 - 1")
+- BILHETES: 13 chars (bilhetes vendidos, numero)
+- ESPECTADORES: 16 chars (assistencia real -- pode diferir de bilhetes: socios entram gratis)
+- RECEITA: 8 chars (receita total em Esc)
 
-### 20.5 ENTRADA DE NOME DO TECNICO (texto livre)
+**Implicacao para o port:** O economy.c calcula receita por jogo mas nao guarda historico.
+Para implementar esta funcionalidade precisaria de um buffer circular de ~10 jogos em casa.
 
-**Evidencia:** offset `0x1b8c5`: `"Entra:"` na area de seleccao inicial de equipa (proximo
-de `"Quer continuar um jogo?"`, `"NOME"`, `"EQUIPA"`).
+### 22.4 PLANTEL -- Mecanica de Substituicoes Dois Paineis
 
-Confirma que o jogo aceita texto livre para o nome do tecnico. O label `"Entra:"` e o prompt
-de entrada de teclado (equivalente a "Digite:"). O port nao implementa entrada de texto.
+**Rotina identificada:** offset `0x1c7a1`. Strings confirmam:
 
-### 20.6 NOME DO NOVO TREINADOR (input na gestao)
+```
+JOGADORES EM CAMPO    JOGADORES NO BANCO
+[lista titulares]     [lista suplentes]
+F1  Substituir
+Esc Fim
+```
 
-**Evidencia:** offset `0x1e50e`: `"Nome: "` no contexto da area de treinadores.
+**Mecanica:**
+- Dois paineis lado a lado (ou alternados numa tela 40 colunas).
+- Cursor navega entre titulares; F1 activa modo de troca.
+- Em modo troca: cursor move para banco, selecciona suplente.
+- Troca e efectuada: titular vai para banco, suplente entra em campo.
+- Esc cancela a troca; mais F1 para outra troca.
+- "Esc Fim" sai do ecra de plantel.
 
-Ao contratar um novo treinador, o original pode mostrar o nome actual e pedir confirmacao.
+**O port actual:** lista unificada com toggle T/S por tecla A. Funciona mas
+e diferente do original que tem dois paineis com troca explicita.
 
-### 20.7 SUPLENTES -- Vista Separada
+### 22.5 PROXIMAS JORNADAS (Shift+F7) -- Implementacao
 
-**Evidencia:** offset `0x1dcc1`: `"SUPLENTESUëÕ©"` (string de titulo de ecra).
+**Nao requer armazenamento adicional.** O algoritmo de Berger ja implementado
+pode pre-calcular qualquer jornada futura. O ecra simplesmente itera de
+`g_round+1` ate `total_rounds` e chama `league_build_round()` para cada uma,
+exibindo os emparelhamentos.
 
-Existe um ecra separado apenas para suplentes, alem do ecra de campo. O port actual mostra
-todos os jogadores numa lista unica com a coluna T/S.
+**Formato:**
+```
+PROXIMAS JORNADAS
+Nª JORNADA
+[equipa A] vs [equipa B]
+[equipa C] vs [equipa D]
+...
+[N+1]ª JORNADA
+...
+```
 
-### 20.8 BOX-DRAWING BORDERS -- UI Original
+### 22.6 MELHORES MARCADORES (Shift+F4) -- Ecra Completo
 
-**Evidencia:** offset `0x171be`: sequencia longa de caracteres de borda CP437 
-(`┌─┐`, `└─┘`, `║`, `═`, `╔`, `╗`, `╚`, `╝`, etc.).
+**Ecra dedicado**, nao apenas o rodape da classificacao. A nossa implementacao
+actual (rodape com 1 linha) e insuficiente.
 
-**Offset `0x180e7`**: `"N╔═════...═╗N"` -- borda dupla da classificacao.
+**Formato esperado:**
+```
+MELHORES MARCADORES
+#  Jogador          Equipa          Golos
+1  [nome]           [clube]           [N]
+2  ...
+```
 
-O original usa bordas graficas extensas. O port usa linhas de traco simples (`-`).
-Nao e uma funcionalidade em falta, mas e uma diferenca visual significativa.
+**Implementacao:** Iterar `g_goals[]`, ordenar por golos decrescente,
+exibir os top 20 com nome do jogador e clube. O array `g_goals[]` ja existe.
 
-### 20.9 IMPRESSORA (LPT1) -- Ignoravel
+### 22.7 COACH PROPOSAL -- "[Treinador]: quer ir treinar o [Clube]? (s/n)"
 
-**Evidencia:** offset `0x16e91`: `"LPT1"`. Suporte a impressora DOS.
-Irrelevante para o port Genesis.
+**Rotina:** offset `0x15ffb`--`0x1612e+`. 
+String exacta: `" : quer ir treinar o "` (com espacos antes e apos).
+
+**Mecanica:** Durante o ciclo de jornadas, o jogo pode gerar um evento onde
+um treinador de uma equipa IA recebe proposta de outra equipa IA. O jogador
+e consultado (s/n) para decidir se a troca acontece. Se aceite, aplica chicotada
+a nova equipa. Afecta o mundo do jogo (equipas rivais ficam mais ou menos fortes).
+
+### 22.8 COACH RETIRES -- "deixa de jogar?"
+
+**Rotina:** offset `0x1e42e` (mesma rotina do screen_coaches).
+Proximo de `"Nº treinador: "` e `"Nome: "`.
+
+**Mecanica:** Em certas condicoes (fim de carreira?), um treinador pode anunciar
+que deixa o futebol. O ecra de treinadores pergunta "deixa de jogar?" e se confirmado,
+o treinador e removido da pool. O jogador precisa contratar um substituto.
 
 ---
 
-## 21. Tabela Final Completa de Gaps (Revisao Final)
+## 23. Tabela de Impacto Revisto -- Com Detalhes de Implementacao
 
-| # | Prioridade | Funcionalidade | Estado |
+| Funcionalidade | Impacto | Custo Impl. | Dados Novos Necessarios |
 |---|---|---|---|
-| 1 | ALTO | Alterar ordenados proactivamente (Ctrl+F2) | Ausente |
-| 2 | MEDIO | Venda directa com preco (Ctrl+F1) | So leilao |
-| 3 | MEDIO | Ecra MELHORES MARCADORES completo (Shift+F4) | Parcial (rodape) |
-| 4 | MEDIO | Equipas Apuradas/Eliminadas copa | Parcial |
-| 5 | MEDIO | Substituicoes F1 no plantel (troca titular<>sub) | Parcial (toggle) |
-| 6 | COSMETICO | Nome do Tecnico (entrada texto livre) | Ausente |
-| 7 | COSMETICO | INTERVALO / PROLONGAMENTO na simulacao | Parcial |
-| 8 | COSMETICO | Bordas graficas CP437 nos ecras | Ausente (usamos tracado) |
-| 9 | BAIXO | Proposta de treinador entre equipas IA | Ausente |
-| 10 | BAIXO | Evento "treinador deixa de jogar" | Ausente |
-| 11 | BAIXO | Vista separada SUPLENTES | Parcial (lista unificada) |
-| 12 | BAIXO | Ultimas Receitas (Ctrl+F5) | Ausente |
-| 13 | BAIXO | Ultimas Transferencias (Ctrl+F4) | Ausente |
-| 14 | BAIXO | Proximas Jornadas (Shift+F7) | Ausente |
-| 15 | BAIXO | Calendario completo (Shift+F1) | Ausente |
-| 16 | BAIXO | Resultados anteriores (Shift+F2) | Ausente |
-| 17 | BAIXO | Titulos das Equipas (Shift+F8) | Ausente |
-| 18 | BAIXO | Titulos dos Treinadores (Shift+F9) | Ausente |
-| 19 | BAIXO | Ultimos Vencedores (Shift+F5) | Ausente |
-| 20 | BAIXO | Premios consultaveis durante temporada | Parcial (so no fim) |
+| Alterar Ordenado (Ctrl+F2) | ALTO | Medio | Nao (reutiliza logica de salary_request) |
+| Venda c/ preco (Ctrl+F1) | MEDIO | Baixo | Nao (transfer_auction ja existe) |
+| Melhores Marcadores ecra | MEDIO | Muito Baixo | Nao (g_goals[] ja existe) |
+| Substituicoes 2 paineis | MEDIO | Medio | Nao (on_field ja existe) |
+| Proximas Jornadas | BAIXO | Muito Baixo | Nao (Berger ja existe) |
+| Ultimas Receitas | BAIXO | Alto | Sim (buffer historico por jogo) |
+| Coach Proposal | BAIXO | Baixo | Nao (coaches ja existem) |
+| Coach Retires | BAIXO | Muito Baixo | Nao (flag no coach) |
+| Resultados anteriores | BAIXO | Muito Baixo | Nao (g_results[] ja existe) |
+| Calendario completo | BAIXO | Muito Baixo | Nao (Berger) |
+| Titulos Equipas/Treinadores | BAIXO | Medio | Sim (contadores por temporada) |
