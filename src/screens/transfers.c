@@ -47,8 +47,17 @@ static void buy_screen(void) {
 
             if (input_pressed(BTN_CONFIRM) && n > 0u) {
                 u16 pidx = candidates[sel];
-                u8  result = transfer_auction(pidx,
-                    g_players[pidx].nat); /* usando nat como team proxy */
+                /* Find which team owns this player */
+                u8  owner_team = 0u;
+                {
+                    u8 tt;
+                    for (tt = 0u; tt < (u8)TEAM_COUNT; tt++) {
+                        u16 ps = g_teams[tt].player_start;
+                        u16 pe = (u16)(ps + g_teams[tt].player_count);
+                        if (pidx >= ps && pidx < pe) { owner_team = tt; break; }
+                    }
+                }
+                u8  result = transfer_auction(pidx, owner_team);
                 ui_clear();
                 if (result) {
                     ui_puts(6u, 13u, UI_PAL_NORMAL, "Transferencia concluida!");
@@ -116,7 +125,16 @@ void screen_transfers(void) {
         /* A = vender jogador seleccionado */
         if (input_pressed(BTN_CONFIRM)) {
             u16 pidx = (u16)(team->player_start + sel);
-            u8  result = transfer_auction(pidx, g_player_team_idx);
+            u8  result;
+            /* Enforce minimum squad constraints */
+            if (team->player_count <= 14u) {
+                ui_clear();
+                ui_puts(4u, 13u, UI_PAL_NORMAL, "Plantel minimo (14 jog.)!");
+                { u16 t; for(t=0u;t<90u;t++){ ui_wait_vblank(); input_update(); if(input_pressed(BTN_CANCEL)) break; } }
+                redraw = 1u;
+                continue;
+            }
+            result = transfer_auction(pidx, g_player_team_idx);
             ui_clear();
             ui_puts(6u, 13u, UI_PAL_NORMAL,
                     result ? "Jogador vendido!" : "Venda nao concluida.");

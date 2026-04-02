@@ -1,10 +1,4 @@
-#ifndef ELIFOOT_PALMARES_H
-#define ELIFOOT_PALMARES_H
-
-#include <genesis.h>
-
-/* screens/palmares.h -- Palmar?s e hist?rico das ?ltimas 5 temporadas */
-
+#ifndef ELF_PALMARES_H
+#define ELF_PALMARES_H
 void screen_palmares(void);
-
 #endif

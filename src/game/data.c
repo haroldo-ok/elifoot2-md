@@ -171,7 +171,7 @@ void data_init(void) {
             copy_name(pl->name, prec, (u8)PLAYER_NAME_LEN);
             pl->pos      = prec[16];
             pl->nat      = nat_from_code(prec + 17u);
-            pl->on_field = (p < 11u) ? 1u : 0u;
+            pl->on_field      = (p < 11u) ? 1u : 0u;
 
             raw = (s16)(75u - (u16)team->n2 * 3u) + (s16)rng_range(20u) - 10;
             if (raw < 20) raw = 20;
@@ -202,6 +202,11 @@ void data_init(void) {
     g_division        = g_teams[0].division;
     g_money           = g_teams[0].money;
     g_results_count   = 0u;
+    {
+        u16 gi;
+        for (gi = 0u; gi < (u16)((u16)TEAM_COUNT * (u16)PLAYERS_PER_TEAM); gi++)
+            g_goals[gi] = 0u;
+    }
     g_cup_ties_count  = 0u;
     g_cup_phase       = 0u;
 }

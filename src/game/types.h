@@ -157,7 +157,7 @@ typedef struct {
     u8    nat;                    /* ?ndice de nacionalidade           */
     u8    strength;               /* for?a 1-99 (calculado em data_init)*/
     u8    on_field;               /* 1=titular, 0=banco                */
-    long  salary;                 /* sal?rio mensal (32 bits)           */
+    long  salary;                 /* salario mensal (32 bits)           */
 } Player;
 
 /*

@@ -46,6 +46,10 @@ extern long g_money;             /* dinheiro da equipe do jogador      */
 /* N?mero de resultados armazenados em g_results[] esta rodada.       */
 extern u8   g_results_count;
 
+/* Gols marcados por jogador na temporada corrente.
+ * Indice = indice global em g_players[]. */
+extern u16  g_goals[TEAM_COUNT * PLAYERS_PER_TEAM];
+
 /* N?mero de confrontos de copa activos em g_cup_ties[].              */
 extern u8   g_cup_ties_count;
 
