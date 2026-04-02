@@ -978,129 +978,111 @@ A paleta principal do jogo usa texto branco (15) ou amarelo (14) sobre fundo azu
 
 ---
 
-## 18. Analise Aprofundada do Executavel -- Adenda (Revisao 2026)
+## 20. Segunda Analise Aprofundada -- Varredura Completa do Binario
 
-> Esta seccao documenta funcionalidades adicionais identificadas por analise directa do binario
-> `elifoot.exe` (143 648 bytes, MZ DOS, Turbo Pascal), complementando a analise anterior.
+> Analise sistematica de TODOS os strings do executavel (8057 strings extraidas),
+> com identificacao de funcionalidades ainda nao documentadas.
 
-### 18.1 NOME DO TECNICO -- Entrada de Nome do Gestor
+### 20.1 MELHORES MARCADORES -- Ecra Dedicado (Shift+F4)
 
-**Evidencia:** offset `0x1a957` contem labels `NOME` e `EQUIPA` na area de inicializacao.
+**Evidencia:** offset `0x10c7b`: `"MELHORES MARCADORES"` (titulo de ecra, nao apenas label de menu).
 
-O jogo pede o **nome do tecnico** antes da escolha de equipa, num novo jogo. Exibido no
-cabecalho durante o jogo. Ausente no port (vai directamente para seleccao de equipa).
+O ecra de artilheiros e um ecra completo separado, nao apenas uma linha na classificacao.
+Mostra todos os jogadores com golos marcados, em ordem decrescente.
+O port actual exibe apenas o artilheiro no rodape da classificacao -- falta o ecra completo.
 
-### 18.2 ALTERAR O ORDENADO (Ctrl+F2) -- Editor Proactivo de Salarios
+### 20.2 SUBSTITUICOES no Plantel (F1 Substituir)
 
-**Evidencia:** offsets `0x12c6d`--`0x12d52`. Strings exactas:
-```
-ALTERAR O ORDENADO
-Escolha o jogador
-Novo ordenado:
-Nem pensar!
-Exijo um minimo de [X]
-Como so tem 14 jogadores / no plantel e obrigado / a aceitar.
-Como so tem um guarda-redes
-Aceita (S/N)?
-Entao adeus.
-```
-O gestor pode **proactivamente** propor um novo salario a qualquer jogador. Se abaixo do minimo,
-jogador responde *"Nem pensar! Exijo um minimo de X"*. Se insistir, jogador pode ir a leilao
-ou sair. Restricoes de plantel (14 jogadores, 1 GR) aplicam-se igual.
+**Evidencia:** offset `0x1c7ed`: `"F1  Substituir"` / `"Esc Fim"` imediatamente apos `"JOGADORES EM CAMPO"` / `"JOGADORES NO BANCO"`.
 
-**Gap no port:** o port so implementa pedidos iniciados PELO JOGADOR antes da jornada. Falta
-a capacidade do gestor de negociar proactivamente.
+O original tem dois modos de visualizacao do plantel:
+- **JOGADORES EM CAMPO** -- titulares
+- **JOGADORES NO BANCO** -- suplentes
 
-### 18.3 VENDER JOGADOR com Preco de Venda (Ctrl+F1) -- Dois Mecanismos
+Com tecla F1 para fazer substituicoes entre os dois grupos. A logica e diferente
+do simples toggle que implementamos: e um mecanismo de TROCA entre titular e suplente
+especifico, provavelmente com confirmacao.
 
-**Evidencia:** offset `0x117c8`: `"Precco de venda: "` (erro de digitacao no binario).
+**String `"SUPLENTES"`** (offset `0x1dcc1`) confirma uma vista separada de suplentes.
 
-Dois mecanismos DISTINTOS no original:
-1. **Venda directa** (Ctrl+F1): gestor define preco, IA escolhe clube comprador.
-   Strings: `"VENDER JOGADOR"`, `"Preco de venda:"`, `"TRANSFERIDO PARA O [CLUBE]"`, `"NAO HOUVE OFERTAS"`.
-2. **Leilao por ordenado**: activado quando jogador recusa aumento.
+### 20.3 PROPOSTA DE TREINADOR ENTRE EQUIPAS IA (Ctrl+F2 area)
 
-O port implementa apenas o leilao. A venda directa com preco configuravel esta ausente.
+**Evidencia:** offset `0x1612e`: `" : quer ir treinar o "` seguido de `" (s/n) ?"`.
 
-### 18.4 ULTIMAS RECEITAS (Ctrl+F5)
+Mecanismo de proposta de treinador entre equipas IA: um treinador de uma equipa IA
+pode querer ir treinar outra equipa IA, e o jogador e consultado (S/N).
+Esta e uma funcionalidade de gestao do mundo do jogo, nao apenas da equipa do jogador.
 
-**Evidencia:** offset `0x11311`:
-```
-ULTIMAS RECEITAS
-ADVERSARIO   JOGO   BILHETES   ESPECTADORES   RECEITA
-```
-Historico de bilheteira por jogo: adversario, resultado, bilhetes, espectadores, receita.
-Nao implementado no port (economia calculada mas nao exibida como historico).
+**String `"Troca com"` (offset `0x164ab`)** e parte do mesmo sistema -- troca de treinadores
+entre clubes (chicotada com troca mutua vs contratacao unilateral).
 
-### 18.5 ULTIMAS TRANSFERENCIAS REALIZADAS (Ctrl+F4)
+### 20.4 TREINADOR DEIXA DE JOGAR
 
-**Evidencia:** offset `0x0f64a`:
-```
-ULTIMAS TRANSFERENCIAS REALIZADAS
-JOGADOR  PS FC NAC  DE  PARA  ORD
-```
-Registo das transferencias com posicao, forca, nac, origem, destino, ordenado. Nao implementado.
+**Evidencia:** offset `0x1e4dd`: `"deixa de jogar? "` na area de gestao de treinadores,
+imediatamente apos `"Nº treinador: "`.
 
-### 18.6 PROXIMAS JORNADAS (Shift+F7) e CALENDARIO (Shift+F1)
+Evento onde um treinador pode anunciar que quer deixar o futebol. Diferente de ser despedido
+-- e uma saida voluntaria do treinador. O jogador provavelmente escolhe o substituto.
 
-**Proximas Jornadas** (`0x103c3`): jornadas ainda por disputar.
-**Calendario** (`0x1163b: "Shift+F1 Calendario"`): calendario completo da temporada.
-Nao implementados no port.
+### 20.5 ENTRADA DE NOME DO TECNICO (texto livre)
 
-### 18.7 RESULTADOS ANTERIORES (Shift+F2)
+**Evidencia:** offset `0x1b8c5`: `"Entra:"` na area de seleccao inicial de equipa (proximo
+de `"Quer continuar um jogo?"`, `"NOME"`, `"EQUIPA"`).
 
-O port guarda `g_results[]` mas nao tem ecra para consultar jornadas anteriores.
+Confirma que o jogo aceita texto livre para o nome do tecnico. O label `"Entra:"` e o prompt
+de entrada de teclado (equivalente a "Digite:"). O port nao implementa entrada de texto.
 
-### 18.8 EQUIPAS APURADAS / ELIMINADAS na Copa
+### 20.6 NOME DO NOVO TREINADOR (input na gestao)
 
-**Evidencia:** `0x07eea: "APURADAS"` / `0x087b7: "ELIMINADAS"`.
-Apos cada fase, o original mostra duas listas separadas. O port mostra os resultados dos jogos
-mas nao a lista explicita de apuradas/eliminadas.
+**Evidencia:** offset `0x1e50e`: `"Nome: "` no contexto da area de treinadores.
 
-### 18.9 INTERVALO e PROLONGAMENTO na Simulacao
+Ao contratar um novo treinador, o original pode mostrar o nome actual e pedir confirmacao.
 
-**Evidencia:** `0x0688b: "INTERVALO"`, `0x06ea4: "PROLONGAMENTO"`.
-O original exibe INTERVALO a meio e PROLONGAMENTO antes dos penaltis. O port vai directamente
-para a simulacao de penaltis sem estas transicoes visuais.
+### 20.7 SUPLENTES -- Vista Separada
 
-### 18.10 MELHORES MARCADORES (Shift+F4)
+**Evidencia:** offset `0x1dcc1`: `"SUPLENTESUëÕ©"` (string de titulo de ecra).
 
-Ecra dedicado aos artilheiros, consultavel durante a temporada. O port regista `g_goals[]` e
-exibe o artilheiro no rodape da classificacao, mas sem ecra proprio de marcadores.
+Existe um ecra separado apenas para suplentes, alem do ecra de campo. O port actual mostra
+todos os jogadores numa lista unica com a coluna T/S.
 
-### 18.11 TITULOS DAS EQUIPAS (Shift+F8) e TREINADORES (Shift+F9)
+### 20.8 BOX-DRAWING BORDERS -- UI Original
 
-**Titulos das Equipas** (`0x1eb2a`): campeonatos e tacas por equipa.
-**Titulos dos Treinadores** (`0x1eeb4`): "NAS ULTIMAS 20 EPOCAS", com CAMPEONATOS e TACAS.
-Nenhum implementado no port.
+**Evidencia:** offset `0x171be`: sequencia longa de caracteres de borda CP437 
+(`┌─┐`, `└─┘`, `║`, `═`, `╔`, `╗`, `╚`, `╝`, etc.).
 
-### 18.12 ULTIMOS VENCEDORES (Shift+F5)
+**Offset `0x180e7`**: `"N╔═════...═╗N"` -- borda dupla da classificacao.
 
-**Evidencia:** `0x18bd9: "ULTIMOS VENCEDORES"` com CAMPEONATO e TACA.
-Vencedores das ultimas temporadas. Nao implementado.
+O original usa bordas graficas extensas. O port usa linhas de traco simples (`-`).
+Nao e uma funcionalidade em falta, mas e uma diferenca visual significativa.
 
-### 18.13 PREMIOS DA TEMPORADA Consultaveis (Ctrl+F3)
+### 20.9 IMPRESSORA (LPT1) -- Ignoravel
 
-Os premios sao visiveis DURANTE a temporada (nao so no fim). O port so os exibe no fim.
+**Evidencia:** offset `0x16e91`: `"LPT1"`. Suporte a impressora DOS.
+Irrelevante para o port Genesis.
 
 ---
 
-## 19. Tabela de Gaps por Prioridade
+## 21. Tabela Final Completa de Gaps (Revisao Final)
 
-| Prioridade | Funcionalidade | Estado no Port |
-|---|---|---|
-| ALTO       | Alterar ordenados (Ctrl+F2)           | Ausente |
-| MEDIO      | Venda directa com preco (Ctrl+F1)     | So leilao |
-| MEDIO      | Ecra Melhores Marcadores (Shift+F4)   | Parcial |
-| MEDIO      | Equipas Apuradas/Eliminadas copa      | Parcial |
-| COSMETICO  | Nome do Tecnico na seleccao inicial   | Ausente |
-| COSMETICO  | INTERVALO / PROLONGAMENTO             | Parcial |
-| BAIXO      | Ultimas Receitas (Ctrl+F5)            | Ausente |
-| BAIXO      | Ultimas Transferencias (Ctrl+F4)      | Ausente |
-| BAIXO      | Proximas Jornadas (Shift+F7)          | Ausente |
-| BAIXO      | Calendario completo (Shift+F1)        | Ausente |
-| BAIXO      | Resultados anteriores (Shift+F2)      | Ausente |
-| BAIXO      | Titulos das Equipas (Shift+F8)        | Ausente |
-| BAIXO      | Titulos dos Treinadores (Shift+F9)    | Ausente |
-| BAIXO      | Ultimos Vencedores (Shift+F5)         | Ausente |
-| BAIXO      | Premios consultaveis durante temporada| Parcial |
+| # | Prioridade | Funcionalidade | Estado |
+|---|---|---|---|
+| 1 | ALTO | Alterar ordenados proactivamente (Ctrl+F2) | Ausente |
+| 2 | MEDIO | Venda directa com preco (Ctrl+F1) | So leilao |
+| 3 | MEDIO | Ecra MELHORES MARCADORES completo (Shift+F4) | Parcial (rodape) |
+| 4 | MEDIO | Equipas Apuradas/Eliminadas copa | Parcial |
+| 5 | MEDIO | Substituicoes F1 no plantel (troca titular<>sub) | Parcial (toggle) |
+| 6 | COSMETICO | Nome do Tecnico (entrada texto livre) | Ausente |
+| 7 | COSMETICO | INTERVALO / PROLONGAMENTO na simulacao | Parcial |
+| 8 | COSMETICO | Bordas graficas CP437 nos ecras | Ausente (usamos tracado) |
+| 9 | BAIXO | Proposta de treinador entre equipas IA | Ausente |
+| 10 | BAIXO | Evento "treinador deixa de jogar" | Ausente |
+| 11 | BAIXO | Vista separada SUPLENTES | Parcial (lista unificada) |
+| 12 | BAIXO | Ultimas Receitas (Ctrl+F5) | Ausente |
+| 13 | BAIXO | Ultimas Transferencias (Ctrl+F4) | Ausente |
+| 14 | BAIXO | Proximas Jornadas (Shift+F7) | Ausente |
+| 15 | BAIXO | Calendario completo (Shift+F1) | Ausente |
+| 16 | BAIXO | Resultados anteriores (Shift+F2) | Ausente |
+| 17 | BAIXO | Titulos das Equipas (Shift+F8) | Ausente |
+| 18 | BAIXO | Titulos dos Treinadores (Shift+F9) | Ausente |
+| 19 | BAIXO | Ultimos Vencedores (Shift+F5) | Ausente |
+| 20 | BAIXO | Premios consultaveis durante temporada | Parcial (so no fim) |
