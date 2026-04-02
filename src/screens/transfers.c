@@ -142,7 +142,7 @@ static void venda_directa(u8 team_idx) {
             ui_puts(2u, 0u, UI_PAL_NORMAL, "VENDA PELA MELHOR OFERTA DE ORDENADO");
             ui_hline(0u, 1u, UI_COLS, UI_PAL_NORMAL);
             ui_puts(0u, 2u, UI_PAL_NORMAL, "JOGADOR       POSICAO FORCA  EQUIPA");
-            ui_hline(0u, 3u, UI_PAL_NORMAL);
+            ui_hline(0u, 3u, UI_COLS, UI_PAL_NORMAL);
             ui_printf(0u, 4u, UI_PAL_NORMAL, "%-14s %2s      %2u     %s",
                       pl->name,
                       s_pos_ao[pl->pos < 4u ? pl->pos : 0u],
