@@ -73,7 +73,7 @@ static u8 startup_screen(void) {
     }
 }
 
-int main(int hardReset) {
+int main(bool hardReset) {
     (void)hardReset;
 
     JOY_init();

@@ -94,6 +94,7 @@ static void copy_name(char *dst, const u8 *src, u8 dst_len) {
 Player       g_players[TEAM_COUNT * PLAYERS_PER_TEAM];
 Team         g_teams[TEAM_COUNT];
 char         g_coaches[COACH_COUNT][COACH_NAME_LEN];
+u16          g_goals[TEAM_COUNT * PLAYERS_PER_TEAM];
 MatchResult  g_results[200];
 CupTie       g_cup_ties[16];
 SeasonRecord g_palmares[PALMARES_COUNT];

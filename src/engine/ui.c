@@ -7,7 +7,6 @@
 #include "font_data.h"
 
 /* stdarg via GCC builtins (SGDK nao tem stdarg.h) */
-int vsprintf(char *buf, const char *fmt, __builtin_va_list ap);
 #ifndef va_list
 typedef __builtin_va_list va_list;
 #define va_start(v,l)  __builtin_va_start(v,l)

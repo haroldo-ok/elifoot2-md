@@ -64,8 +64,8 @@ static void show_round_results(const LeagueRound *rnd, u8 div) {
 
 static void show_standings_brief(u8 div) {
     u8  order[29];
-    u8  count, i;
-    u8  top = (count > 10u) ? 10u : count;
+    u8  count = 0u, i;
+    u8  top;
 
     data_sort_standings(div, order, &count);
     top = (count > 10u) ? 10u : count;
