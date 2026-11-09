@@ -1,90 +1,103 @@
-/*
- * engine/ui.h -- Camada de UI para Elifoot II Genesis
- *
- * Interface limpa entre logica de jogo e display VDP.
- * Toda a logica de jogo e cega a estes detalhes.
- *
- * DECISOES DE DESIGN:
- *   - Um unico plano BG_A para todo o texto (sem WINDOW, sem BG_B para texto).
- *   - BG_B = fundo solido (cor backdrop, preenchido uma vez).
- *   - Sem scroll. Tilemap 64x32, ecra visivel 40x28.
- *   - Paleta PAL0: [0]=bg (azul escuro), [1]=fg (branco), [2]=amarelo, [3]=ciano.
- *   - Paleta PAL1: [0]=sel-bg (ciano), [1]=sel-fg (preto).
- *   - Fonte CP850 8x8, carregada como array C no FONT_SLOT (tile 16..124).
- */
-
 #ifndef ELF_UI_H
 #define ELF_UI_H
 
 #include <genesis.h>
 
-/* ------------------------------------------------------------------
- * Constantes publicas
- * ------------------------------------------------------------------ */
-
-#define UI_COLS      40   /* colunas visiveis do ecra                 */
-#define UI_ROWS      28   /* linhas  visiveis do ecra                 */
-
-/* Indices de cor da paleta PAL0 (texto normal)                       */
-#define UI_COL_BG     0   /* azul escuro -- fundo / "transparente"    */
-#define UI_COL_FG     1   /* branco      -- texto padrao              */
-#define UI_COL_TITLE  2   /* amarelo     -- titulos                   */
-#define UI_COL_INFO   3   /* ciano       -- valores / info            */
-#define UI_COL_WARN   4   /* vermelho    -- avisos / negativos        */
-#define UI_COL_DIM    5   /* cinzento    -- texto secundario          */
-
-/* Paleta para linha seleccionada / cursor                            */
-#define UI_PAL_NORMAL   PAL0
-#define UI_PAL_SELECT   PAL1
-
-/* ------------------------------------------------------------------
- * API publica
- * ------------------------------------------------------------------ */
-
 /*
- * ui_init() -- Inicializa VDP, carrega paletas e fonte.
- * Deve ser chamada uma vez antes de qualquer outra funcao de UI.
+ * engine/ui.h -- Texto em 40x28 com cores CGA arbitrarias.
+ *
+ * O original desenha tudo em cores CGA (texto 0-15 sobre fundo 0-15), e os
+ * nomes dos clubes nas cores do clube. Aqui cada combinacao
+ * (caracter, cor de texto, cor de fundo) gera um tile em VRAM na primeira
+ * vez que e usada; a cache e esvaziada em ui_cls().
+ * Tudo usa a PAL0, que contem as 16 cores CGA.
  */
+
+#define UI_COLS      40
+#define UI_ROWS      28
+
+/* Cores CGA */
+#define C_BLACK    0u
+#define C_BLUE     1u
+#define C_GREEN    2u
+#define C_CYAN     3u
+#define C_RED      4u
+#define C_MAGENTA  5u
+#define C_BROWN    6u
+#define C_LGRAY    7u
+#define C_DGRAY    8u
+#define C_LBLUE    9u
+#define C_LGREEN  10u
+#define C_LCYAN   11u
+#define C_LRED    12u
+#define C_LMAGENTA 13u
+#define C_YELLOW  14u
+#define C_WHITE   15u
+
+/* Caracteres de desenho de caixas (glifos 128..140 da fonte). */
+#define CH_H     ((char)128)   /* ─ */
+#define CH_V     ((char)129)   /* │ */
+#define CH_TL    ((char)130)   /* ┌ */
+#define CH_TR    ((char)131)   /* ┐ */
+#define CH_BL    ((char)132)   /* └ */
+#define CH_BR    ((char)133)   /* ┘ */
+#define CH_DH    ((char)134)   /* ═ */
+#define CH_DV    ((char)135)   /* ║ */
+#define CH_DTL   ((char)136)   /* ╔ */
+#define CH_DTR   ((char)137)   /* ╗ */
+#define CH_DBL   ((char)138)   /* ╚ */
+#define CH_DBR   ((char)139)   /* ╝ */
+#define CH_X     ((char)140)   /* ┼ */
+#define CH_BLOCK ((char)141)   /* bloco cheio (barras do estadio) */
+
+/* Modo de teste: compilado com -DELF_AUTOPLAY, o jogo joga-se sozinho
+ * (todas as perguntas recebem a resposta por omissao). */
+extern u8 g_autoplay;
+
 void ui_init(void);
 
-/*
- * ui_clear() -- Limpa o ecra inteiro (escreve tiles de espaco em toda BG_A).
- */
-void ui_clear(void);
+/* Limpa o ecra com a cor de fundo bg e esvazia a cache de tiles. */
+void ui_cls(u8 bg);
 
-/*
- * ui_puts(x, y, pal, str) -- Escreve string em (x,y) com paleta pal.
- * pal = UI_PAL_NORMAL ou UI_PAL_SELECT.
- * Clips ao limite do ecra. Nao faz wrap.
- */
-void ui_puts(u16 x, u16 y, u16 pal, const char *str);
+void ui_putc_c(u16 x, u16 y, u8 fg, u8 bg, char c);
+void ui_text(u16 x, u16 y, u8 fg, u8 bg, const char *s);
+/* Escreve s em exactamente w colunas (corta ou completa com espacos). */
+void ui_textw(u16 x, u16 y, u16 w, u8 fg, u8 bg, const char *s);
+void ui_textf(u16 x, u16 y, u8 fg, u8 bg, const char *fmt, ...);
+/* Formata para buffer (mesmos formatos: %s %u %d %lu %ld, largura, '-'). */
+void ui_sprintf(char *out, u16 cap, const char *fmt, ...);
 
-/*
- * ui_putc(x, y, pal, c) -- Escreve um caracter.
- */
-void ui_putc(u16 x, u16 y, u16 pal, char c);
+void ui_fill(u16 x, u16 y, u16 w, u16 h, u8 bg);
+/* Caixa com moldura simples (fg) e interior bg. */
+void ui_box(u16 x, u16 y, u16 w, u16 h, u8 fg, u8 bg);
+/* Titulo centrado numa caixa de 3 linhas. */
+void ui_title(u16 y, const char *s, u8 fg, u8 bg, u8 frame);
+void ui_hbar(u16 x, u16 y, u16 len, u8 fg, u8 bg);
 
-/*
- * ui_printf(x, y, pal, fmt, ...) -- puts com formato.
- * Usa buffer interno de 42 chars.
- */
-void ui_printf(u16 x, u16 y, u16 pal, const char *fmt, ...);
+/* Nome do clube t nas cores do clube, em w colunas. */
+void ui_team(u16 x, u16 y, u16 w, u8 team);
+u8   ui_team_fg(u8 team);
+u8   ui_team_bg(u8 team);
 
-/*
- * ui_fill_row(y, pal) -- Preenche linha y inteira com espaco na paleta pal.
- * Util para realcar linha seleccionada.
- */
-void ui_fill_row(u16 y, u16 pal);
+/* Barra de ajuda na ultima linha. */
+void ui_help(const char *s);
 
-/*
- * ui_hline(x, y, len, pal) -- Linha horizontal com caracter '─'.
- */
-void ui_hline(u16 x, u16 y, u16 len, u16 pal);
-
-/*
- * ui_wait_vblank() -- Sincroniza com o VBlank (chama SYS_doVBlankProcess).
- * Deve ser chamada uma vez por frame no loop principal.
- */
 void ui_wait_vblank(void);
+/* Espera n frames (sai mais cedo se carregar A/B/C/START e skip=1). */
+u8   ui_delay(u16 frames, u8 skip);
+/* Espera A, B, C ou START. Devolve o botao. */
+u16  ui_wait_key(void);
+/* Pergunta S/N: A = sim (1), B = nao (0). */
+u8   ui_ask_yn(u16 y, u8 fg, u8 bg, const char *q);
+
+/* ---- Compatibilidade com o codigo antigo ---------------------------- */
+#define UI_PAL_NORMAL   0u    /* branco sobre azul    */
+#define UI_PAL_SELECT   1u    /* preto sobre ciano    */
+void ui_clear(void);
+void ui_puts(u16 x, u16 y, u16 pal, const char *str);
+void ui_putc(u16 x, u16 y, u16 pal, char c);
+void ui_printf(u16 x, u16 y, u16 pal, const char *fmt, ...);
+void ui_fill_row(u16 y, u16 pal);
+void ui_hline(u16 x, u16 y, u16 len, u16 pal);
 
 #endif /* ELF_UI_H */

@@ -1,173 +1,113 @@
 /*
- * game/economy.c -- Sistema econ?mico do Elifoot II Genesis
+ * game/economy.c -- Ordenados, bilheteira, socios, estadio, premios
  *
- * m68k / SGDK 1.70 caveats:
- *   - Todos os valores monet?rios usam 'long' (32 bits).
- *     int = 16 bits no m68k -- sal?rios e receitas excedem facilmente 32767.
- *   - Bilheteria: attendance ? ticket_price pode ser 30000 ? 10 = 300000L.
- *   - Pr?mios: at? 500000L para campe?o da Div1.
- *   - Multiplica??es u16 ? u16 podem exceder u16 -- usar long explicitamente.
+ * Observado no original: ordenados pagos todas as jornadas; receita de
+ * casa = publico x preco do bilhete (15183 x 10); bancadas de 5000
+ * lugares a 100000; premios de Ctrl+F3. O resto e inferido.
  */
 
 #include <genesis.h>
 #include "economy.h"
 #include "data.h"
+#include "history.h"
+#include "season.h"
 #include "../engine/rng.h"
-#include "../engine/compat.h"
 
-/* ------------------------------------------------------------------ */
-/* Tabela de pr?mios por posi??o (Div1 e Div2)                        */
-/* ------------------------------------------------------------------ */
-
-/* Pr?mio para posi??o pos (1-based) na divis?o div (0=Div1, 1=Div2). */
-static long s_prizes_div1[16] = {
-    500000L, 350000L, 250000L, 180000L, 130000L, 100000L,
-     80000L,  60000L,  40000L,  30000L,  20000L,  15000L,
-     10000L,   8000L,   5000L,   3000L,
+static const long s_prizes[7] = {
+    1000000L, 500000L, 300000L, 500000L, 200000L, 200000L, 200000L
 };
-static long s_prizes_div2[13] = {
-    200000L, 140000L, 100000L,  70000L,  50000L,  35000L,
-     25000L,  18000L,  12000L,   8000L,   5000L,   3000L,
-      2000L,
+static const char * const s_prize_lbl[7] = {
+    "VENCEDOR DO CAMPEONATO", "2o CLASSIFICADO", "3o CLASSIFICADO",
+    "VENCEDOR DA TACA", "MELHOR ATAQUE", "MELHOR DEFESA", "MELHOR MARCADOR"
 };
 
-/* ------------------------------------------------------------------ */
-/* economy_min_salary()                                                */
-/* ------------------------------------------------------------------ */
+long economy_prize(u8 k) { return (k < 7u) ? s_prizes[k] : 0L; }
+const char *economy_prize_label(u8 k) { return (k < 7u) ? s_prize_lbl[k] : ""; }
 
-long economy_min_salary(u8 strength) {
-    /* Fiel ao original: sal?rio m?nimo = for?a ? 100 escudos/m?s.    */
-    return (long)strength * 100L;
+/* Publico: socios (quase todos vao) + procura que depende do adversario. */
+u16 economy_attendance(u8 home, u8 away) {
+    Team *h = &g_teams[home], *a = &g_teams[away];
+    u32 v = ((u32)h->socios * 90UL) / 100UL;
+    u16 cap = data_capacity(home);
+    v += rng_range((u16)(h->socios / 4u + 1u));
+    v += (u32)a->socios / 10UL;
+    if (a->div < h->div) v += (u32)a->socios / 8UL;   /* visita de um grande */
+    if (v > cap) v = cap;
+    return (u16)v;
 }
 
-/* ------------------------------------------------------------------ */
-/* economy_process_salary_requests()                                   */
-/* ------------------------------------------------------------------ */
-
-u8 economy_process_salary_requests(u8 team_idx) {
-    Team  *team;
-    Player *pl;
-    u8     i, left = 0u;
-    u8     forced_out = 0u;
-    u16    pi;
-
-    if (team_idx >= (u8)TEAM_COUNT) return 0u;
-    team = &g_teams[team_idx];
-
-    for (i = 0u; i < team->player_count; i++) {
-        pi = (u16)team->player_start + i;
-        pl = &g_players[pi];
-
-        if (pl->salary >= economy_min_salary(pl->strength)) continue;
-
-        /* Jogador insatisfeito com o sal?rio.                         */
-        /* Verificar se a equipa pode perder o jogador:               */
-        /*   - M?nimo de 14 no plantel                                */
-        /*   - Pelo menos 1 guarda-redes                              */
-        u8 gk_count   = data_get_team_gk_count(team_idx);
-        u8 total      = data_get_team_player_count(team_idx);
-        u8 is_only_gk = (pl->pos == (u8)POS_GR && gk_count <= 1u);
-        u8 too_few    = (total <= (u8)MIN_SQUAD_SIZE);
-
-        if (is_only_gk || too_few) {
-            /* For?ado a manter: aumenta sal?rio ao m?nimo            */
-            team->salary_total -= pl->salary;
-            pl->salary          = economy_min_salary(pl->strength);
-            team->salary_total += pl->salary;
-        } else {
-            /* 50% de chance de sair (comportamento do original)      */
-            if (rng_range(2u) == 0u) {
-                /* Jogador sai -- remove do plantel (marca como inativo) */
-                /* Implementa??o simplificada: apenas reduz player_count */
-                /* e compacta o array (memmove via compat_memmove)     */
-                team->salary_total -= pl->salary;
-                /* Compacta: move os jogadores seguintes uma posi??o   */
-                if (i < (u8)(team->player_count - 1u)) {
-                    u16 src = pi + 1u;
-                    u16 dst = pi;
-                    u16 rem = (u16)(team->player_count - 1u - i);
-                    compat_memmove(
-                        &g_players[dst],
-                        &g_players[src],
-                        (u16)(rem * sizeof(Player))
-                    );
-                    i--;   /* reprocessa a posi??o atual              */
-                }
-                team->player_count--;
-                forced_out++;
-            } else {
-                /* Aceita continuar: aumenta sal?rio ao m?nimo        */
-                team->salary_total -= pl->salary;
-                pl->salary          = economy_min_salary(pl->strength);
-                team->salary_total += pl->salary;
-            }
-        }
-        left++;
+void economy_home_revenue(const LiveGame *g, u8 kind) {
+    Team *h = &g_teams[g->home];
+    long rev = (long)g->spectators * (long)h->ticket;
+    u8 m = data_team_mgr(g->home);
+    h->money += rev;
+    if (m != 0xFFu) {
+        /* bilhetes = publico sem os socios presentes (inferido) */
+        u16 tick = (g->spectators > h->socios) ? (u16)(g->spectators - h->socios) : 0u;
+        data_record_revenue(m, kind == SLOT_LEAGUE ? 0u : 1u, g->away,
+                            g->hg, g->ag, tick, g->spectators, rev);
     }
-    (void)left;
-    return forced_out;
 }
 
-/* ------------------------------------------------------------------ */
-/* economy_ticket_revenue()                                            */
-/* ------------------------------------------------------------------ */
-
-long economy_ticket_revenue(u8 home_team) {
-    Team *home;
-    u16   attendance;
-
-    if (home_team >= (u8)TEAM_COUNT) return 0L;
-    home = &g_teams[home_team];
-
-    /* P?blico = metade da capacidade + varia??o aleat?ria de 25%.    */
-    /* Usar u16 -- stadium_cap max 30000, cabe em u16.                 */
-    attendance = (u16)(home->stadium_cap / 2u) +
-                 rng_range((u16)(home->stadium_cap / 4u));
-
-    if (attendance > home->stadium_cap) attendance = home->stadium_cap;
-
-    return (long)attendance * (long)home->ticket_price;
+static void socios_delta(u8 t, s16 pm) {
+    Team *tm = &g_teams[t];
+    s32 v = (s32)tm->socios + ((s32)tm->socios * pm) / 1000L
+            + (s32)rng_range(41u) - 20L;
+    if (v < 1000) v = 1000;
+    if (v > 60000) v = 60000;
+    tm->socios = (u16)v;
 }
 
-/* ------------------------------------------------------------------ */
-/* economy_pay_prizes()                                                */
-/* ------------------------------------------------------------------ */
+void economy_socios_after(const LiveGame *g) {
+    s16 h = (g->hg > g->ag) ? 6 : (g->hg < g->ag) ? -6 : 0;
+    socios_delta(g->home, h);
+    socios_delta(g->away, (s16)-h);
+}
+
+void economy_pay_salaries(u8 t) {
+    g_teams[t].money -= data_total_salaries(t);
+}
+
+void economy_stands_tick(u8 t) {
+    Team *tm = &g_teams[t];
+    u8 i, k = 0u;
+    for (i = 0u; i < tm->nstands; i++) {
+        if (tm->stand_life[i] > 1u) tm->stand_life[k++] = (u8)(tm->stand_life[i] - 1u);
+        /* bancada que chega a 0 e demolida */
+    }
+    for (i = k; i < STANDS_MAX; i++) tm->stand_life[i] = 0u;
+    tm->nstands = k;
+}
+
+u8 economy_build_stand(u8 t) {
+    Team *tm = &g_teams[t];
+    if (tm->nstands >= STANDS_MAX || tm->money < STAND_PRICE) return 0u;
+    tm->money -= STAND_PRICE;
+    tm->stand_life[tm->nstands++] = STAND_LIFE;
+    return 1u;
+}
+
+void economy_ai_finances(u8 t) {
+    Team *tm = &g_teams[t];
+    /* A IA repoe bancadas quando o publico nao cabe e ha dinheiro. */
+    u16 want = (u16)(tm->socios + tm->socios / 3u);
+    if (data_capacity(t) < want && tm->money > 300000L) economy_build_stand(t);
+}
+
+static void pay(u8 t, u8 k) {
+    if (t < (u8)TEAM_COUNT) g_teams[t].money += economy_prize(k);
+}
 
 void economy_pay_prizes(void) {
-    u8  order[TEAM_COUNT];
-    u8  count;
-    u8  i;
-    u8  div;
-
-    for (div = 0u; div < 2u; div++) {
-        data_sort_standings(div, order, &count);
-        for (i = 0u; i < count; i++) {
-            long prize = (div == 0u) ?
-                ((i < 16u) ? s_prizes_div1[i] : 0L) :
-                ((i < 13u) ? s_prizes_div2[i] : 0L);
-            g_teams[order[i]].money += prize;
-        }
+    u8 d;
+    for (d = 0u; d < DIVISIONS; d++) {
+        DivAwards *aw = &g_awards[d];
+        pay(aw->first, PRIZE_FIRST);
+        pay(aw->second, PRIZE_SECOND);
+        pay(aw->third, PRIZE_THIRD);
+        pay(aw->attack, PRIZE_ATTACK);
+        pay(aw->defence, PRIZE_DEFENCE);
+        if (aw->scorer != PLAYER_NONE) pay(g_players[aw->scorer].team, PRIZE_SCORER);
     }
-}
-
-/* ------------------------------------------------------------------ */
-/* economy_pay_monthly_salaries()                                      */
-/* ------------------------------------------------------------------ */
-
-void economy_pay_monthly_salaries(void) {
-    u8 t;
-    for (t = 0u; t < (u8)TEAM_COUNT; t++) {
-        g_teams[t].money -= g_teams[t].salary_total;
-    }
-    /* Sincroniza g_money com a equipa do jogador                      */
-    g_money = g_teams[g_player_team_idx].money;
-}
-
-/* ------------------------------------------------------------------ */
-/* economy_can_pay_salaries()                                          */
-/* ------------------------------------------------------------------ */
-
-u8 economy_can_pay_salaries(u8 team_idx) {
-    if (team_idx >= (u8)TEAM_COUNT) return 0u;
-    return (g_teams[team_idx].money >= g_teams[team_idx].salary_total) ? 1u : 0u;
+    pay(g_cup_winner, PRIZE_CUP);
 }

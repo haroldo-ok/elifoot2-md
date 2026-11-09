@@ -17,7 +17,7 @@
 
 # ---------------------------------------------------------------------
 # Dados binarios (BIN)
-# teams.bin   : 11894 bytes (29 equipas x 464 jogadores)
+# teams.bin   : 13124 bytes (32 equipas x 16 jogadores)
 # coaches.bin : 1002 bytes  (50 treinadores)
 # ---------------------------------------------------------------------
 BIN teams_data   "../data/teams.bin"   2 2 0 0

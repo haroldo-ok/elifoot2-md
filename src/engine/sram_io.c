@@ -1,316 +1,230 @@
 /*
- * engine/sram_io.c -- Save/Load em SRAM para Elifoot II Genesis
+ * engine/sram_io.c -- Gravacao do estado completo em SRAM
  *
- * SGDK 1.70 caveats:
- *   - SRAM_readBuffer / SRAM_writeBuffer N?O existem em SGDK 1.70.
- *     Implementar como loop de SRAM_readByte / SRAM_writeByte.
- *   - SRAM_enable() ANTES e SRAM_disable() DEPOIS de qualquer acesso.
- *     Em hardware real, SRAM_disable() ? obrigat?rio para proteger os dados.
- *   - u32 para o offset em SRAM_readByte/writeByte (endere?o no espa?o
- *     de mem?ria do Mega Drive, n?o apenas posi??o no banco).
- *   - int = 16 bits: contadores de loop usam u16, n?o int.
- *
- * Serializa??o big-endian (m68k native) para todos os campos multi-byte.
+ * Layout: [0..3] "ELF2", [4..5] versao. Gravacao n em 0x10 + n*0x2000:
+ *   [0..1] CRC-16/CCITT dos dados, [2..3] tamanho, [4..] dados.
+ * Os nomes de equipas/jogadores nao sao gravados (vem da ROM; os
+ * jogadores mantem o indice original).
  */
 
 #include <genesis.h>
 #include "sram_io.h"
 #include "../game/data.h"
-#include "../game/types.h"
+#include "../game/history.h"
 
-/* ------------------------------------------------------------------ */
-/* Constantes de layout SRAM                                           */
-/* ------------------------------------------------------------------ */
+#define SLOT_BASE   0x0010UL
+#define SLOT_SIZE   0x2000UL
+#define SLOT_DATA   4UL
 
-/* Use constants from types.h: SRAM_MAGIC_OFFSET, SRAM_VERSION_OFFSET */
-#define SRAM_VERSION_OFFSET 0x0004UL
-#define SRAM_SLOT0_OFFSET   SRAM_SLOT_BASE
+static u32 s_off;
+static u16 s_crc;
 
-/* Tamanho do conte?do serializado de um slot (sem os 2 bytes de CRC) */
-#define SLOT_CONTENT_SIZE   1822u
-
-/* Tamanho total do buffer de um slot (CRC + conte?do)                */
-#define SLOT_BUFFER_SIZE    1824u
-
-/* Layout por equipa no slot: 14 bytes                                */
-#define TEAM_SAVE_SIZE      14u
-
-/* Layout por jogador no slot: 3 bytes                                */
-#define PLAYER_SAVE_SIZE    3u
-
-/* Layout por entrada de palmares: 4 bytes                            */
-#define PALMARES_SAVE_SIZE  4u
-
-/* ------------------------------------------------------------------ */
-/* I/O de baixo n?vel                                                  */
-/* ------------------------------------------------------------------ */
-
-static void sram_write_buf(u32 offset, const u8 *buf, u16 len) {
-    u16 i;
-    SRAM_enable();
-    for (i = 0u; i < len; i++) {
-        SRAM_writeByte(offset + (u32)i, buf[i]);
-    }
-    SRAM_disable();
-}
-
-static void sram_read_buf(u32 offset, u8 *buf, u16 len) {
-    u16 i;
-    SRAM_enable();
-    for (i = 0u; i < len; i++) {
-        buf[i] = SRAM_readByte(offset + (u32)i);
-    }
-    SRAM_disable();
-}
-
-/* ------------------------------------------------------------------ */
-/* CRC-16/CCITT (polin?mio 0x1021)                                    */
-/* ------------------------------------------------------------------ */
-
-static u16 crc16(const u8 *data, u16 len) {
-    u16 crc = 0xFFFFu;
-    u16 i;
-    u8  b;
-    for (i = 0u; i < len; i++) {
-        crc ^= (u16)((u16)data[i] << 8);
-        for (b = 0u; b < 8u; b++) {
-            crc = (crc & 0x8000u) ? (u16)((crc << 1) ^ 0x1021u) : (u16)(crc << 1);
-        }
-    }
+static u16 crc_step(u16 crc, u8 b) {
+    u8 k;
+    crc ^= (u16)((u16)b << 8);
+    for (k = 0u; k < 8u; k++)
+        crc = (crc & 0x8000u) ? (u16)((crc << 1) ^ 0x1021u) : (u16)(crc << 1);
     return crc;
 }
 
-/* ------------------------------------------------------------------ */
-/* Helpers de serializa??o (big-endian)                               */
-/* ------------------------------------------------------------------ */
+static void w8(u8 v)  { SRAM_writeByte(s_off++, v); s_crc = crc_step(s_crc, v); }
+static void w16(u16 v){ w8((u8)(v >> 8)); w8((u8)v); }
+static void w32(long v){ u32 u = (u32)v; w16((u16)(u >> 16)); w16((u16)u); }
+static void wbuf(const void *p, u16 n) { const u8 *b = (const u8 *)p; while (n--) w8(*b++); }
 
-static u16 put_u8(u8 *buf, u16 pos, u8 val) {
-    buf[pos] = val;
-    return (u16)(pos + 1u);
-}
+static u8  r8(void)  { u8 v = SRAM_readByte(s_off++); return v; }
+static u16 r16(void) { u16 h = r8(); return (u16)((h << 8) | r8()); }
+static long r32(void){ u32 h = r16(); return (long)((h << 16) | r16()); }
+static void rbuf(void *p, u16 n) { u8 *b = (u8 *)p; while (n--) *b++ = r8(); }
 
-static u16 put_u16(u8 *buf, u16 pos, u16 val) {
-    buf[pos]     = (u8)(val >> 8);
-    buf[pos + 1u] = (u8)(val & 0xFFu);
-    return (u16)(pos + 2u);
-}
-
-static u16 put_long(u8 *buf, u16 pos, long val) {
-    u32 v = (u32)val;
-    buf[pos]     = (u8)(v >> 24);
-    buf[pos + 1u] = (u8)(v >> 16);
-    buf[pos + 2u] = (u8)(v >> 8);
-    buf[pos + 3u] = (u8)(v & 0xFFu);
-    return (u16)(pos + 4u);
-}
-
-static u16 get_u8(const u8 *buf, u16 pos, u8 *out) {
-    *out = buf[pos];
-    return (u16)(pos + 1u);
-}
-
-static u16 get_u16(const u8 *buf, u16 pos, u16 *out) {
-    *out = ((u16)buf[pos] << 8) | (u16)buf[pos + 1u];
-    return (u16)(pos + 2u);
-}
-
-static u16 get_long(const u8 *buf, u16 pos, long *out) {
-    u32 v = ((u32)buf[pos]     << 24)
-          | ((u32)buf[pos + 1u] << 16)
-          | ((u32)buf[pos + 2u] << 8)
-          |  (u32)buf[pos + 3u];
-    *out = (long)v;
-    return (u16)(pos + 4u);
-}
-
-/* ------------------------------------------------------------------ */
-/* sram_init()                                                         */
-/* ------------------------------------------------------------------ */
+static u32 slot_addr(u8 slot) { return SLOT_BASE + (u32)slot * SLOT_SIZE; }
 
 void sram_init(void) {
-    u8  magic[4];
-    u16 version;
-
-    sram_read_buf(SRAM_MAGIC_OFFSET, magic, 4u);
-
-    if (magic[0] == (u8)SRAM_MAGIC_0 &&
-        magic[1] == (u8)SRAM_MAGIC_1 &&
-        magic[2] == (u8)SRAM_MAGIC_2 &&
-        magic[3] == (u8)SRAM_MAGIC_3) {
-        /* Magic OK -- verifica vers?o                                  */
-        sram_read_buf(SRAM_VERSION_OFFSET, magic, 2u);
-        version = ((u16)magic[0] << 8) | (u16)magic[1];
-        if (version == (u16)SRAM_SAVE_VERSION) return;
+    u8 ok;
+    SRAM_enable();
+    ok = SRAM_readByte(0) == 'E' && SRAM_readByte(1) == 'L' && SRAM_readByte(2) == 'F'
+      && SRAM_readByte(3) == '2'
+      && SRAM_readByte(4) == (u8)(SRAM_SAVE_VERSION >> 8)
+      && SRAM_readByte(5) == (u8)SRAM_SAVE_VERSION;
+    if (!ok) {
+        u8 s;
+        SRAM_writeByte(0, 'E'); SRAM_writeByte(1, 'L');
+        SRAM_writeByte(2, 'F'); SRAM_writeByte(3, '2');
+        SRAM_writeByte(4, (u8)(SRAM_SAVE_VERSION >> 8));
+        SRAM_writeByte(5, (u8)SRAM_SAVE_VERSION);
+        for (s = 0u; s < SAVE_SLOTS; s++) {      /* invalida as gravacoes */
+            SRAM_writeByte(slot_addr(s) + 2UL, 0);
+            SRAM_writeByte(slot_addr(s) + 3UL, 0);
+        }
     }
-
-    /* SRAM virgem ou vers?o errada -- inicializa cabe?alho             */
-    {
-        u8 hdr[6];
-        hdr[0] = (u8)SRAM_MAGIC_0;
-        hdr[1] = (u8)SRAM_MAGIC_1;
-        hdr[2] = (u8)SRAM_MAGIC_2;
-        hdr[3] = (u8)SRAM_MAGIC_3;
-        hdr[4] = (u8)((u16)SRAM_SAVE_VERSION >> 8);
-        hdr[5] = (u8)((u16)SRAM_SAVE_VERSION & 0xFFu);
-        sram_write_buf(SRAM_MAGIC_OFFSET, hdr, 6u);
-    }
+    SRAM_disable();
 }
 
 /* ------------------------------------------------------------------ */
-/* sram_save()                                                         */
-/* ------------------------------------------------------------------ */
-
-u8 sram_save(u8 slot) {
-    /*
-     * Buffer est?tico para o slot -- 1824 bytes.
-     * Est?tico para n?o consumir stack do m68k (stack ? limitado).
-     * ATEN??O: n?o ? reentrante, mas save nunca ? chamado de IRQ.
-     */
-    static u8 buf[SLOT_BUFFER_SIZE];
-    u16  pos = 2u;   /* primeiros 2 bytes = CRC (preenchido no fim)    */
-    u32  slot_offset;
-    u16  crc;
-    u8   t, p, i;
-
-    if ((u16)slot >= (u16)SAVE_SLOT_COUNT) return 0u;
-    slot_offset = SRAM_SLOT0_OFFSET + (u32)slot * (u32)SRAM_SLOT_SIZE;
-
-    /* Cabe?alho do slot                                               */
-    pos = put_u8(buf, pos, g_season_num);
-    pos = put_u8(buf, pos, g_round);
-    pos = put_u8(buf, pos, g_player_team_idx);
-    pos = put_u8(buf, pos, g_cup_phase);
-
-    /* 29 equipas ? 14 bytes                                           */
+static void write_state(const char *name) {
+    u8 t, i, j, d, m, k;
+    u16 p;
+    char nm[SAVE_NAME_LEN];
+    for (i = 0u; i < SAVE_NAME_LEN; i++) nm[i] = 0;
+    data_strcpy(nm, name, SAVE_NAME_LEN);
+    wbuf(nm, SAVE_NAME_LEN);
+    w8(g_season); w8(g_slot); w8(g_mgr_count);
+    for (m = 0u; m < MAX_MANAGERS; m++) { wbuf(g_mgr[m].name, MGR_NAME_LEN); w8(g_mgr[m].team); }
     for (t = 0u; t < (u8)TEAM_COUNT; t++) {
-        Team *team = &g_teams[t];
-        pos = put_u8 (buf, pos, team->division);
-        pos = put_long(buf, pos, team->money);
-        pos = put_u8 (buf, pos, team->wins);
-        pos = put_u8 (buf, pos, team->draws);
-        pos = put_u8 (buf, pos, team->losses);
-        pos = put_u8 (buf, pos, team->goals_for);
-        pos = put_u8 (buf, pos, team->goals_against);
-        pos = put_u16(buf, pos, team->points);
-        pos = put_u16(buf, pos, team->stadium_cap);
+        Team *tm = &g_teams[t];
+        w8(tm->div); w8(tm->formation); w8(tm->coach); w32(tm->money);
+        w8(tm->hw); w8(tm->hd); w8(tm->hl); w8(tm->hgf); w8(tm->hga);
+        w8(tm->aw); w8(tm->ad); w8(tm->al); w8(tm->agf); w8(tm->aga);
+        w8(tm->nstands); wbuf(tm->stand_life, STANDS_MAX);
+        w16(tm->socios); w16(tm->ticket);
+        w8(tm->cup_alive); w8(tm->cup_reach); w8(tm->boost);
     }
-
-    /* 464 jogadores ? 3 bytes: strength + salary_lo + salary_hi      */
-    /* Salary comprimido para 16 bits (max 65535 escudos)              */
-    for (p = 0u; p < (u16)(TEAM_COUNT * PLAYERS_PER_TEAM); p++) {
-        Player *pl  = &g_players[p];
-        u16    sal16 = (pl->salary > 65535L) ? 65535u : (u16)pl->salary;
-        pos = put_u8 (buf, pos, pl->strength);
-        pos = put_u16(buf, pos, sal16);
-    }
-
-    /* Palmares ? 4 bytes                                              */
-    for (i = 0u; i < (u8)PALMARES_COUNT; i++) {
-        pos = put_u8(buf, pos, g_palmares[i].season_num);
-        pos = put_u8(buf, pos, g_palmares[i].div1_champion);
-        pos = put_u8(buf, pos, g_palmares[i].cup_champion);
-        pos = put_u8(buf, pos, g_palmares[i].player_pos);
-    }
-
-    /* CRC sobre os bytes 2..pos-1                                     */
-    crc    = crc16(buf + 2u, (u16)(pos - 2u));
-    buf[0] = (u8)(crc >> 8);
-    buf[1] = (u8)(crc & 0xFFu);
-
-    sram_write_buf(slot_offset, buf, pos);
-    return 1u;
-}
-
-/* ------------------------------------------------------------------ */
-/* sram_load()                                                         */
-/* ------------------------------------------------------------------ */
-
-u8 sram_load(u8 slot) {
-    static u8 buf[SLOT_BUFFER_SIZE];
-    u32  slot_offset;
-    u16  stored_crc, calc_crc;
-    u16  pos = 2u;
-    u8   t, p, i;
-
-    if ((u16)slot >= (u16)SAVE_SLOT_COUNT) return 0u;
-    slot_offset = SRAM_SLOT0_OFFSET + (u32)slot * (u32)SRAM_SLOT_SIZE;
-
-    sram_read_buf(slot_offset, buf, (u16)SLOT_BUFFER_SIZE);
-
-    stored_crc = ((u16)buf[0] << 8) | (u16)buf[1];
-    calc_crc   = crc16(buf + 2u, (u16)(SLOT_BUFFER_SIZE - 2u));
-    if (stored_crc != calc_crc) return 0u;
-
-    /* Cabe?alho                                                       */
-    pos = get_u8(buf, pos, &g_season_num);
-    pos = get_u8(buf, pos, &g_round);
-    pos = get_u8(buf, pos, &g_player_team_idx);
-    pos = get_u8(buf, pos, &g_cup_phase);
-
-    /* 29 equipas                                                      */
-    for (t = 0u; t < (u8)TEAM_COUNT; t++) {
-        Team *team = &g_teams[t];
-        pos = get_u8 (buf, pos, &team->division);
-        pos = get_long(buf, pos, &team->money);
-        pos = get_u8 (buf, pos, &team->wins);
-        pos = get_u8 (buf, pos, &team->draws);
-        pos = get_u8 (buf, pos, &team->losses);
-        pos = get_u8 (buf, pos, &team->goals_for);
-        pos = get_u8 (buf, pos, &team->goals_against);
-        pos = get_u16(buf, pos, &team->points);
-        pos = get_u16(buf, pos, &team->stadium_cap);
-    }
-
-    /* 464 jogadores                                                   */
-    for (p = 0u; p < (u16)(TEAM_COUNT * PLAYERS_PER_TEAM); p++) {
+    for (p = 0u; p < PLAYER_COUNT; p++) {
         Player *pl = &g_players[p];
-        u16     sal16;
-        pos       = get_u8 (buf, pos, &pl->strength);
-        pos       = get_u16(buf, pos, &sal16);
-        pl->salary = (long)sal16;
+        w8(pl->team); w8(pl->base); w8(pl->str); w8(pl->flags); w8(pl->goals); w16(pl->salary);
     }
-
-    /* Palmares                                                        */
-    for (i = 0u; i < (u8)PALMARES_COUNT; i++) {
-        pos = get_u8(buf, pos, &g_palmares[i].season_num);
-        pos = get_u8(buf, pos, &g_palmares[i].div1_champion);
-        pos = get_u8(buf, pos, &g_palmares[i].cup_champion);
-        pos = get_u8(buf, pos, &g_palmares[i].player_pos);
+    for (d = 0u; d < DIVISIONS; d++) {
+        wbuf(g_div_team[d], TEAMS_PER_DIV);
+        for (i = 0u; i < TEAMS_PER_DIV; i++) wbuf(g_res[d][i], TEAMS_PER_DIV);
     }
+    w8(g_cup_n); w8(g_cup_phase); w8(g_cup_winner);
+    for (i = 0u; i < 16u; i++) wbuf(&g_cup[i], sizeof(CupTie));
+    w8(g_transfer_n);
+    for (i = 0u; i < TRANSFER_HIST; i++) {
+        TransferRec *r = &g_transfers[i];
+        w16(r->player); w8(r->from); w8(r->to); w8(r->str); w16(r->salary);
+    }
+    for (m = 0u; m < MAX_MANAGERS; m++)
+        for (k = 0u; k < 2u; k++) {
+            w8(g_rev_n[m][k]);
+            for (j = 0u; j < REVENUE_HIST; j++) {
+                RevenueRec *r = &g_rev[m][k][j];
+                w8(r->opp); w8(r->gh); w8(r->ga);
+                w16(r->tickets); w16(r->spectators); w32(r->revenue);
+            }
+        }
+    for (t = 0u; t < (u8)TEAM_COUNT; t++) wbuf(&g_honours[t], sizeof(TeamHonours));
+    w8(g_winners_n);
+    for (i = 0u; i < WINNERS_MAX; i++) wbuf(&g_winners[i], sizeof(WinnerRec));
+    for (m = 0u; m < MAX_MANAGERS; m++) wbuf(g_hist_mgr_name[m], MGR_NAME_LEN);
+    w8(g_awards_valid);
+    for (d = 0u; d < DIVISIONS; d++) {
+        DivAwards *a = &g_awards[d];
+        w8(a->first); w8(a->second); w8(a->third);
+        w8(a->attack); w8(a->attack_goals); w8(a->defence); w8(a->defence_goals);
+        w8(a->scorer_goals); w16(a->scorer);
+    }
+}
 
-    /* Sincroniza estado global                                        */
-    g_division = g_teams[g_player_team_idx].division;
-    g_money    = g_teams[g_player_team_idx].money;
-    return 1u;
+static void read_state(void) {
+    u8 t, i, j, d, m, k;
+    u16 p;
+    char nm[SAVE_NAME_LEN];
+    rbuf(nm, SAVE_NAME_LEN);
+    g_season = r8(); g_slot = r8(); g_mgr_count = r8();
+    if (g_mgr_count > MAX_MANAGERS) g_mgr_count = MAX_MANAGERS;
+    for (m = 0u; m < MAX_MANAGERS; m++) { rbuf(g_mgr[m].name, MGR_NAME_LEN); g_mgr[m].team = r8(); }
+    for (t = 0u; t < (u8)TEAM_COUNT; t++) {
+        Team *tm = &g_teams[t];
+        tm->div = r8(); tm->formation = r8(); tm->coach = r8(); tm->money = r32();
+        tm->hw = r8(); tm->hd = r8(); tm->hl = r8(); tm->hgf = r8(); tm->hga = r8();
+        tm->aw = r8(); tm->ad = r8(); tm->al = r8(); tm->agf = r8(); tm->aga = r8();
+        tm->nstands = r8(); rbuf(tm->stand_life, STANDS_MAX);
+        tm->socios = r16(); tm->ticket = r16();
+        tm->cup_alive = r8(); tm->cup_reach = r8(); tm->boost = r8();
+    }
+    for (p = 0u; p < PLAYER_COUNT; p++) {
+        Player *pl = &g_players[p];
+        pl->team = r8(); pl->base = r8(); pl->str = r8(); pl->flags = r8(); pl->goals = r8();
+        pl->salary = r16();
+    }
+    for (d = 0u; d < DIVISIONS; d++) {
+        rbuf(g_div_team[d], TEAMS_PER_DIV);
+        for (i = 0u; i < TEAMS_PER_DIV; i++) rbuf(g_res[d][i], TEAMS_PER_DIV);
+    }
+    g_cup_n = r8(); g_cup_phase = r8(); g_cup_winner = r8();
+    for (i = 0u; i < 16u; i++) rbuf(&g_cup[i], sizeof(CupTie));
+    g_transfer_n = r8();
+    for (i = 0u; i < TRANSFER_HIST; i++) {
+        TransferRec *r = &g_transfers[i];
+        r->player = r16(); r->from = r8(); r->to = r8(); r->str = r8(); r->salary = r16();
+    }
+    for (m = 0u; m < MAX_MANAGERS; m++)
+        for (k = 0u; k < 2u; k++) {
+            g_rev_n[m][k] = r8();
+            for (j = 0u; j < REVENUE_HIST; j++) {
+                RevenueRec *r = &g_rev[m][k][j];
+                r->opp = r8(); r->gh = r8(); r->ga = r8();
+                r->tickets = r16(); r->spectators = r16(); r->revenue = r32();
+            }
+        }
+    for (t = 0u; t < (u8)TEAM_COUNT; t++) rbuf(&g_honours[t], sizeof(TeamHonours));
+    g_winners_n = r8();
+    for (i = 0u; i < WINNERS_MAX; i++) rbuf(&g_winners[i], sizeof(WinnerRec));
+    for (m = 0u; m < MAX_MANAGERS; m++) rbuf(g_hist_mgr_name[m], MGR_NAME_LEN);
+    g_awards_valid = r8();
+    for (d = 0u; d < DIVISIONS; d++) {
+        DivAwards *a = &g_awards[d];
+        a->first = r8(); a->second = r8(); a->third = r8();
+        a->attack = r8(); a->attack_goals = r8(); a->defence = r8(); a->defence_goals = r8();
+        a->scorer_goals = r8(); a->scorer = r16();
+    }
+    for (t = 0u; t < (u8)TEAM_COUNT; t++) g_teams[t].manager = data_team_mgr(t);
+    data_rosters_changed();
+    g_cur_mgr = 0u;
 }
 
 /* ------------------------------------------------------------------ */
-/* sram_slot_valid()                                                   */
-/* ------------------------------------------------------------------ */
+u8 sram_save(u8 slot, const char *name) {
+    u32 base;
+    u16 len;
+    if (slot >= SAVE_SLOTS) return 0u;
+    base = slot_addr(slot);
+    SRAM_enable();
+    s_off = base + SLOT_DATA;
+    s_crc = 0xFFFFu;
+    write_state(name);
+    len = (u16)(s_off - base - SLOT_DATA);
+    SRAM_writeByte(base + 0UL, (u8)(s_crc >> 8));
+    SRAM_writeByte(base + 1UL, (u8)s_crc);
+    SRAM_writeByte(base + 2UL, (u8)(len >> 8));
+    SRAM_writeByte(base + 3UL, (u8)len);
+    SRAM_disable();
+    return 1u;
+}
 
 u8 sram_slot_valid(u8 slot) {
-    static u8 buf[SLOT_BUFFER_SIZE];
-    u32  slot_offset;
-    u16  stored_crc, calc_crc;
-
-    if ((u16)slot >= (u16)SAVE_SLOT_COUNT) return 0u;
-    slot_offset = SRAM_SLOT0_OFFSET + (u32)slot * (u32)SRAM_SLOT_SIZE;
-    sram_read_buf(slot_offset, buf, (u16)SLOT_BUFFER_SIZE);
-    stored_crc = ((u16)buf[0] << 8) | (u16)buf[1];
-    calc_crc   = crc16(buf + 2u, (u16)(SLOT_BUFFER_SIZE - 2u));
-    return (stored_crc == calc_crc) ? 1u : 0u;
+    u32 base;
+    u16 len, stored, crc = 0xFFFFu, i;
+    if (slot >= SAVE_SLOTS) return 0u;
+    base = slot_addr(slot);
+    SRAM_enable();
+    stored = (u16)(((u16)SRAM_readByte(base) << 8) | SRAM_readByte(base + 1UL));
+    len    = (u16)(((u16)SRAM_readByte(base + 2UL) << 8) | SRAM_readByte(base + 3UL));
+    if (len == 0u || len > (u16)(SLOT_SIZE - SLOT_DATA)) { SRAM_disable(); return 0u; }
+    for (i = 0u; i < len; i++) crc = crc_step(crc, SRAM_readByte(base + SLOT_DATA + i));
+    SRAM_disable();
+    return crc == stored;
 }
 
-/* ------------------------------------------------------------------ */
-/* sram_slot_season()                                                  */
-/* ------------------------------------------------------------------ */
-
-u8 sram_slot_season(u8 slot) {
-    u8  hdr[3];
-    u32 slot_offset;
-    if ((u16)slot >= (u16)SAVE_SLOT_COUNT) return 0u;
+u8 sram_load(u8 slot) {
     if (!sram_slot_valid(slot)) return 0u;
-    slot_offset = SRAM_SLOT0_OFFSET + (u32)slot * (u32)SRAM_SLOT_SIZE;
-    sram_read_buf(slot_offset + 2UL, hdr, 1u);   /* byte 2 = season_num */
-    return hdr[0];
+    SRAM_enable();
+    s_off = slot_addr(slot) + SLOT_DATA;
+    read_state();
+    SRAM_disable();
+    return 1u;
+}
+
+u8 sram_slot_info(u8 slot, char *name, u8 *season) {
+    u32 a;
+    u8 i;
+    if (!sram_slot_valid(slot)) return 0u;
+    a = slot_addr(slot) + SLOT_DATA;
+    SRAM_enable();
+    for (i = 0u; i < SAVE_NAME_LEN; i++) name[i] = (char)SRAM_readByte(a + i);
+    name[SAVE_NAME_LEN - 1u] = '\0';
+    *season = SRAM_readByte(a + SAVE_NAME_LEN);
+    SRAM_disable();
+    return 1u;
 }

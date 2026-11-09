@@ -1,158 +1,108 @@
 /*
- * game/match.c -- Simula??o de partidas do Elifoot II Genesis
- *
- * Algoritmo fiel ao comportamento original do Elifoot II (Turbo Pascal):
- *   1. Calcular for?a m?dia dos 11 titulares de cada equipe.
- *   2. Equipa da casa recebe b?nus de +5 pontos de for?a.
- *   3. N?mero total de oportunidades de golo: 3 ou 4 (aleat?rio).
- *   4. Cada oportunidade ? atribu?da ? equipa mais forte com
- *      probabilidade proporcional ? for?a relativa.
- *   5. N?o todos os eventos s?o gols -- aplicar taxa de convers?o.
- *
- * m68k caveats respeitados:
- *   - int = 16 bits: todas as for?as e probabilidades usam u16.
- *   - Multiplica??es de u16?u16 podem exceder 65535 -- usar u32 quando
- *     necess?rio (ex: home_prob = (str_h * 100) / total).
- *   - N?O chama SYS_doVBlankProcess() -- seguro em loops de simula??o.
+ * game/match.c -- Simulacao minuto a minuto (inferida; o binario nao
+ * expoe a formula). Ataque = 2xAV + MD; defesa = 3xGR + 2xDF + MD.
+ * Golos esperados por equipa ~ 3.75 * ataque / (ataque + defesa adv.),
+ * casa +15%. Dois clubes iguais em 4-4-2 dao ~1.3 golos cada.
  */
 
 #include <genesis.h>
 #include "match.h"
+#include "tactics.h"
 #include "data.h"
 #include "../engine/rng.h"
-#include "../screens/coaches.h"
 
-/* ------------------------------------------------------------------ */
-/* match_team_strength()                                               */
-/* ------------------------------------------------------------------ */
+LiveGame g_live[16];
+u8       g_live_n   = 0u;
+u8       g_live_cup = 0u;
 
-u16 match_team_strength(u8 team_idx) {
-    Team *t = &g_teams[team_idx];
-    u16   total = 0u;
-    u16   count = 0u;
-    u16   i;
-
-    for (i = 0u; i < (u16)t->player_count; i++) {
-        Player *pl = &g_players[(u16)t->player_start + i];
-        if (pl->on_field) {
-            total += (u16)pl->strength;
-            count++;
-        }
-    }
-    if (count == 0u) return 1u;
-    {
-        u16 base = total / count;
-        /* Chicotada psicologica: +COACH_BOOST_STRENGTH se boost activo */
-        if (g_coach_boost_team == team_idx && g_coach_boost_rounds > 0u) {
-            base += (u16)COACH_BOOST_STRENGTH;
-        }
-        return base;
-    }
+static u16 goal_threshold(u16 att, u16 def, u8 home) {
+    /* lam100 = golos esperados * 100 em 90 min */
+    u32 lam100 = (375UL * att) / ((u32)att + def);
+    if (home) lam100 = (lam100 * 115UL) / 100UL;
+    /* por minuto, em 1/10000: lam100 * 10000 / (90 * 100) */
+    return (u16)((lam100 * 10UL) / 9UL);
 }
 
-/* ------------------------------------------------------------------ */
-/* match_simulate()                                                    */
-/* ------------------------------------------------------------------ */
+void match_recompute(u8 i) {
+    LiveGame *g = &g_live[i];
+    u16 ah, dh, aa, da;
+    tactics_rating(g->home, &ah, &dh);
+    tactics_rating(g->away, &aa, &da);
+    g->thr_h = goal_threshold(ah, da, 1u);
+    g->thr_a = goal_threshold(aa, dh, 0u);
+}
 
-MatchResult match_simulate(u8 home, u8 away) {
-    MatchResult r;
-    u16  str_h, str_a, total;
-    u16  home_prob;         /* probabilidade de golo para casa (0-100) */
-    u16  opportunities;     /* n?mero de oportunidades de golo         */
-    u16  i;
-    u8   hg = 0u, ag = 0u;
+void match_setup(u8 i, u8 home, u8 away, u8 league) {
+    LiveGame *g = &g_live[i];
+    (void)league;
+    g->home = home; g->away = away;
+    g->hg = g->ag = 0u;
+    g->last_team = TEAM_NONE;
+    g->last_min = 0u;
+    g->last_player = PLAYER_NONE;
+    g->spectators = 0u;
+    g->extra = g->pens = 0u;
+    g->ph = g->pa = 0u;
+    match_recompute(i);
+}
 
-    r.home_team = home;
-    r.away_team = away;
-    r.round     = g_round;
-    r.division  = g_teams[home].division;
+/* Marcador: titulares, AV peso 6, MD 3, DF 1, GR 0. */
+static u16 pick_scorer(u8 t) {
+    u16 st[16];
+    u8 n = tactics_starters(t, st), i;
+    u16 total = 0u, r;
+    for (i = 0u; i < n; i++) {
+        u8 pos = g_players[st[i]].pos;
+        total = (u16)(total + (pos == POS_AV ? 6u : pos == POS_MD ? 3u : pos == POS_DF ? 1u : 0u));
+    }
+    if (total == 0u) return n ? st[0] : PLAYER_NONE;
+    r = rng_range(total);
+    for (i = 0u; i < n; i++) {
+        u8 pos = g_players[st[i]].pos;
+        u16 w = (u16)(pos == POS_AV ? 6u : pos == POS_MD ? 3u : pos == POS_DF ? 1u : 0u);
+        if (r < w) return st[i];
+        r = (u16)(r - w);
+    }
+    return st[0];
+}
 
-    str_h = match_team_strength(home) + 5u;  /* b?nus de casa          */
-    str_a = match_team_strength(away);
-    total = str_h + str_a;
-    if (total == 0u) total = 1u;
+static void goal(LiveGame *g, u8 home, u8 m, u8 league) {
+    u8 t = home ? g->home : g->away;
+    u16 p = pick_scorer(t);
+    if (home) g->hg++; else g->ag++;
+    g->last_team = t;
+    g->last_min = m;
+    g->last_player = p;
+    if (league && p != PLAYER_NONE && g_players[p].goals < 255u) g_players[p].goals++;
+}
 
-    /* Probabilidade proporcional ? for?a -- usar u32 para evitar overflow:
-     * str_h pode ser at? ~105 (100+5), * 100 = 10500 -- cabe em u16,
-     * mas ser expl?cito ? mais seguro no m68k.                        */
-    home_prob = (u16)(((u32)str_h * 100UL) / (u32)total);
+u8 match_minute(u8 i, u8 m, u8 league) {
+    LiveGame *g = &g_live[i];
+    u8 scored = 0u;
+    if (rng_range(10000u) < g->thr_h) { goal(g, 1u, m, league); scored = 1u; }
+    if (rng_range(10000u) < g->thr_a) { goal(g, 0u, m, league); scored = 1u; }
+    return scored;
+}
 
-    /* 3 ou 4 oportunidades de golo por partida (em m?dia ~2.5)        */
-    opportunities = 3u + rng_range(2u);
-
-    for (i = 0u; i < opportunities; i++) {
-        /*
-         * Taxa de convers?o: ~70% das oportunidades s?o gols.
-         * Fiel ao original: nem toda oportunidade resulta em golo.
-         * Usar rng_range(10) < 7 = 70% de probabilidade.
-         */
-        if (rng_range(10u) >= 7u) continue;  /* oportunidade desperdi?ada */
-
-        if (rng_range(100u) < home_prob) {
-            hg++;
-        } else {
-            ag++;
+u8 match_penalties(u8 i, PenaltyCb cb) {
+    LiveGame *g = &g_live[i];
+    u8 k = 0u;
+    g->pens = 1u;
+    g->ph = g->pa = 0u;
+    for (;;) {
+        u8 sh = (rng_range(100u) < 75u), sa = (rng_range(100u) < 75u);
+        g->ph = (u8)(g->ph + sh);
+        if (cb) cb(i, k, 1u, sh);
+        g->pa = (u8)(g->pa + sa);
+        if (cb) cb(i, k, 0u, sa);
+        k++;
+        if (k >= 5u && g->ph != g->pa) break;
+        if (k < 5u) {
+            /* ja decidido antes dos 5? */
+            u8 left = (u8)(5u - k);
+            if (g->ph > (u8)(g->pa + left) || g->pa > (u8)(g->ph + left)) break;
         }
+        if (k > 30u) { g->ph++; break; }
     }
-
-    r.home_goals = hg;
-    r.away_goals = ag;
-
-    /* ---- Atualiza estat?sticas das equipas ---- */
-    g_teams[home].goals_for     += hg;
-    g_teams[home].goals_against += ag;
-    g_teams[away].goals_for     += ag;
-    g_teams[away].goals_against += hg;
-
-    /* Assign goals to random titulars (for artilharia/top scorer) */
-    {
-        u8  g, ti;
-        u16 pi;
-        /* Home goals */
-        for (g = 0u; g < hg; g++) {
-            /* Pick random on-field player from home team */
-            for (ti = 0u; ti < 20u; ti++) {
-                pi = (u16)(g_teams[home].player_start
-                    + rng_range((u16)g_teams[home].player_count));
-                if (g_players[pi].on_field) {
-                    g_goals[pi]++;
-                    break;
-                }
-            }
-        }
-        /* Away goals */
-        for (g = 0u; g < ag; g++) {
-            for (ti = 0u; ti < 20u; ti++) {
-                pi = (u16)(g_teams[away].player_start
-                    + rng_range((u16)g_teams[away].player_count));
-                if (g_players[pi].on_field) {
-                    g_goals[pi]++;
-                    break;
-                }
-            }
-        }
-    }
-
-    if (hg > ag) {
-        g_teams[home].wins++;
-        g_teams[away].losses++;
-        g_teams[home].points += 3u;
-    } else if (hg < ag) {
-        g_teams[away].wins++;
-        g_teams[home].losses++;
-        g_teams[away].points += 3u;
-    } else {
-        g_teams[home].draws++;
-        g_teams[away].draws++;
-        g_teams[home].points += 1u;
-        g_teams[away].points += 1u;
-    }
-
-    /* Guarda resultado no array global (sem overflow -- max 200)       */
-    if (g_results_count < 200u) {
-        g_results[g_results_count] = r;
-        g_results_count++;
-    }
-
-    return r;
+    return (g->ph > g->pa) ? g->home : g->away;
 }
