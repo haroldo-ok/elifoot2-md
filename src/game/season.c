@@ -1,297 +1,262 @@
 /*
- * game/season.c -- Coordena??o de temporada completa
- *
- * season_run() orquestra:
- *   1. Reset de estat?sticas
- *   2. Por cada jornada:
- *      a. Menu pr?-jornada
- *      b. Simula??o de todos os jogos da jornada
- *      c. Pagamento de sal?rios (cada 4 jornadas)
- *      d. Exibi??o de resultados
- *   3. Fim: pr?mios, promo??o/rebaixamento
- *
- * SYS_doVBlankProcess() APENAS nos loops de input -- nunca na simula??o.
- * int = 16 bits: contadores de jornada usam u8.
+ * game/season.c -- Calendario, campeonato, taca e passagem de jornada
  */
 
 #include <genesis.h>
 #include "season.h"
 #include "data.h"
-#include "league.h"
+#include "match.h"
+#include "tactics.h"
 #include "economy.h"
-#include "transfer.h"
-#include "types.h"
-#include "../engine/input.h"
-#include "../engine/render.h"
-#include "../engine/sram_io.h"
-#include "../screens/main_menu.h"
-#include "cup.h"
-#include "../screens/coaches.h"
+#include "history.h"
+#include "../engine/rng.h"
 
-/* ------------------------------------------------------------------ */
-/* Telas auxiliares (implementa??o inline, Fase 3 separa em screens/) */
-/* ------------------------------------------------------------------ */
+/* ---- Calendario --------------------------------------------------- */
+/* slot: 0=L1 1=L2 2=T1 3=L3 4=T2 ... 18=T9 19=L11 20=T10 21=L12 22=L13 23=L14 */
+u8 season_slot_kind(u8 s) {
+    if (s < 2u || s > 20u) return SLOT_LEAGUE;
+    return ((s & 1u) == 0u) ? SLOT_CUP : SLOT_LEAGUE;
+}
 
-static void show_standings(u8 div) {
-    u8  order[TEAM_COUNT];
-    u8  count, i;
-    u16 row = (u16)CONTENT_ROW_FIRST;
+u8 season_slot_index(u8 s) {
+    if (s < 2u) return s;                          /* L1, L2 */
+    if (s > 20u) return (u8)(s - 10u);             /* L12..L14 = 11..13 */
+    if ((s & 1u) == 0u) return (u8)((s - 2u) / 2u); /* T1..T10 = 0..9 */
+    return (u8)((s - 3u) / 2u + 2u);               /* L3..L11 = 2..10 */
+}
 
-    data_sort_standings(div, order, &count);
-    render_clear_content();
-    render_textf(BG_A, 1u, row++, PAL_MAIN,
-                 "Classificacao Div%u  Jornada %u",
-                 (u16)(div+1u), (u16)g_round);
-    render_hline(BG_A, 1u, row++, 38u, BOX_SIMPLE, PAL_MAIN);
-    render_text(BG_A, " Pos Equipa              V  E  D  Pts",
-                1u, row++, PAL_MAIN);
-    render_hline(BG_A, 1u, row++, 38u, BOX_SIMPLE, PAL_MAIN);
-
-    for (i = 0u; i < count && row <= (u16)CONTENT_ROW_LAST; i++) {
-        u8    t  = order[i];
-        Team *tm = &g_teams[t];
-        u16  pal = (t == g_player_team_idx) ? PAL_SELECTED : PAL_MAIN;
-        if (pal == PAL_SELECTED)
-            render_fill_rect(BG_A, 1u, row, 38u, 1u, PAL_SELECTED, 0u);
-        render_textf(BG_A, 1u, row, pal,
-                     "%3u. %-16s %2u %2u %2u %3u",
-                     (u16)(i+1u), tm->name,
-                     (u16)tm->wins, (u16)tm->draws, (u16)tm->losses,
-                     (u16)tm->points);
-        row++;
+/* Metodo do circulo para 8 equipas: 7 jornadas, depois inverte casa/fora. */
+void league_pair(u8 r, u8 k, u8 *home, u8 *away) {
+    u8 rr = (u8)(r % 7u), a, b, swap;
+    if (k == 0u) {
+        a = 7u; b = rr;
+        swap = (u8)(rr & 1u);
+    } else {
+        a = (u8)((rr + k) % 7u);
+        b = (u8)((rr + 7u - k) % 7u);
+        swap = (u8)(k & 1u);
     }
+    if (r >= 7u) swap ^= 1u;
+    if (swap) { *home = b; *away = a; } else { *home = a; *away = b; }
+}
 
-    render_help_bar("[A/B] Continuar", NULL);
-    for (;;) {
-        SYS_doVBlankProcess();
-        input_update();
-        if (input_pressed(BTN_CONFIRM) || input_pressed(BTN_CANCEL)) return;
+u8 league_opponent(u8 t, u8 r, u8 *home) {
+    u8 d = g_teams[t].div, s = data_div_slot(t), k, h, a;
+    for (k = 0u; k < 4u; k++) {
+        league_pair(r, k, &h, &a);
+        if (h == s) { *home = 1u; return g_div_team[d][a]; }
+        if (a == s) { *home = 0u; return g_div_team[d][h]; }
+    }
+    *home = 1u;
+    return TEAM_NONE;
+}
+
+/* ---- Taca --------------------------------------------------------- */
+void cup_draw(void) {
+    u8 pool[TEAM_COUNT], n = 0u, t, i;
+    for (t = 0u; t < (u8)TEAM_COUNT; t++) if (g_teams[t].cup_alive) pool[n++] = t;
+    for (i = (u8)(n - 1u); i > 0u; i--) {
+        u8 j = (u8)rng_range((u16)(i + 1u)), x = pool[i];
+        pool[i] = pool[j]; pool[j] = x;
+    }
+    g_cup_n = 0u;
+    for (i = 0u; (u8)(i + 1u) < n && g_cup_n < 16u; i = (u8)(i + 2u)) {
+        CupTie *c = &g_cup[g_cup_n++];
+        c->a = pool[i]; c->b = pool[i + 1u];
+        c->ga1 = c->gb1 = c->ga2 = c->gb2 = 0u;
+        c->pa = c->pb = 0u;
+        c->winner = TEAM_NONE;
+        c->extra = 0u;
     }
 }
 
-static void show_results(u8 div, u8 round_num) {
-    u8   i, shown = 0u;
-    u16  row = (u16)CONTENT_ROW_FIRST;
+u8 cup_tie_of(u8 t) {
+    u8 i;
+    for (i = 0u; i < g_cup_n; i++) if (g_cup[i].a == t || g_cup[i].b == t) return i;
+    return 0xFFu;
+}
 
-    render_clear_content();
-    render_textf(BG_A, 1u, row++, PAL_MAIN,
-                 "Resultados Jornada %u  Div%u",
-                 (u16)round_num, (u16)(div+1u));
-    render_hline(BG_A, 1u, row++, 38u, BOX_SIMPLE, PAL_MAIN);
-
-    for (i = 0u; i < g_results_count && row <= (u16)CONTENT_ROW_LAST - 1u; i++) {
-        MatchResult *r = &g_results[i];
-        if (r->division != div) continue;
-        {
-            u16 pal = ((r->home_team == g_player_team_idx ||
-                        r->away_team == g_player_team_idx)) ?
-                      PAL_SELECTED : PAL_MAIN;
-            if (pal == PAL_SELECTED)
-                render_fill_rect(BG_A, 1u, row, 38u, 1u, PAL_SELECTED, 0u);
-            render_textf(BG_A, 1u, row, pal,
-                         "%-14s  %u - %u  %-14s",
-                         g_teams[r->home_team].name, (u16)r->home_goals,
-                         (u16)r->away_goals, g_teams[r->away_team].name);
+u8 season_next_match(u8 t, u8 *home, u8 *slot) {
+    u8 s;
+    for (s = g_slot; s < SEASON_SLOTS; s++) {
+        u8 idx = season_slot_index(s);
+        if (season_slot_kind(s) == SLOT_LEAGUE) {
+            *slot = s;
+            return league_opponent(t, idx, home);
         }
-        row++;
-        shown++;
-    }
-    if (shown == 0u) {
-        render_text(BG_A, "(sem jogos nesta divisao)", 2u, row, PAL_MAIN);
-    }
-
-    render_help_bar("[A] Classificacao  [B] Continuar", NULL);
-    for (;;) {
-        SYS_doVBlankProcess();
-        input_update();
-        if (input_pressed(BTN_CONFIRM)) { show_standings(div); return; }
-        if (input_pressed(BTN_CANCEL))  return;
-    }
-}
-
-static void pre_round_menu(void) {
-    render_clear_content();
-    render_textf(BG_A, 2u, (u16)CONTENT_ROW_FIRST, PAL_MAIN,
-                 "Temporada %u  Jornada %u",
-                 (u16)g_season_num, (u16)g_round);
-    render_textf(BG_A, 2u, (u16)(CONTENT_ROW_FIRST+1u), PAL_MAIN,
-                 "Equipa: %-16s", g_teams[g_player_team_idx].name);
-    render_textf(BG_A, 2u, (u16)(CONTENT_ROW_FIRST+2u), PAL_MAIN,
-                 "Dinheiro: %ld esc.", g_money);
-    render_hline(BG_A, 1u, (u16)(CONTENT_ROW_FIRST+4u), 38u, BOX_SIMPLE, PAL_MAIN);
-    render_text(BG_A, "[A] Jogar Jornada",  2u, (u16)(CONTENT_ROW_FIRST+5u), PAL_MAIN);
-    render_text(BG_A, "[B] Classificacao",  2u, (u16)(CONTENT_ROW_FIRST+6u), PAL_MAIN);
-    render_text(BG_A, "[Start] Gravar",     2u, (u16)(CONTENT_ROW_FIRST+7u), PAL_MAIN);
-    render_help_bar("[A]Jogar  [B]Class.  [Start]Gravar", NULL);
-
-    for (;;) {
-        SYS_doVBlankProcess();
-        input_update();
-
-        if (input_pressed(BTN_CONFIRM)) return;
-
-        if (input_pressed(BTN_CANCEL)) { show_standings(g_division); return; }
-
-        if (input_pressed(BTN_START)) {
-            render_fill_rect(BG_A, 2u, (u16)(CONTENT_ROW_FIRST+9u),
-                             36u, 1u, PAL_SELECTED, 0u);
-            render_text(BG_A, "Gravar em slot: [A]=0  [B]=1  [C]=2",
-                        2u, (u16)(CONTENT_ROW_FIRST+9u), PAL_SELECTED);
-            for (;;) {
-                SYS_doVBlankProcess();
-                input_update();
-                if (input_pressed(BTN_CONFIRM)) { sram_save(0u); break; }
-                if (input_pressed(BTN_CANCEL))  { sram_save(1u); break; }
-                if (input_pressed(BTN_ACTION))  { sram_save(2u); break; }
+        /* taca: so a fase actual e conhecida */
+        if (CUP_PHASE_OF(idx) == g_cup_phase && g_teams[t].cup_alive) {
+            u8 c = cup_tie_of(t);
+            if (c != 0xFFu) {
+                u8 a_side = (g_cup[c].a == t);
+                *slot = s;
+                *home = CUP_LEG_OF(idx) == 0u ? a_side : (u8)!a_side;
+                return a_side ? g_cup[c].b : g_cup[c].a;
             }
-            render_text(BG_A, "Gravado!                              ",
-                        2u, (u16)(CONTENT_ROW_FIRST+9u), PAL_MAIN);
         }
+    }
+    *home = 1u; *slot = SEASON_SLOTS;
+    return TEAM_NONE;
+}
+
+/* ---- Epoca ---------------------------------------------------------- */
+void season_start(void) {
+    g_slot = 0u;
+    g_cup_phase = 0u;
+    g_cup_winner = TEAM_NONE;
+    data_new_season_tables();
+    cup_draw();
+}
+
+void season_setup_games(void) {
+    u8 kind = season_slot_kind(g_slot), idx = season_slot_index(g_slot);
+    u8 t, i;
+
+    /* IA escolhe a tactica; humanos ja escolheram (garante 11 titulares) */
+    for (t = 0u; t < (u8)TEAM_COUNT; t++) {
+        if (!data_is_human(t)) tactics_ai(t);
+        else {
+            u16 st[16];
+            if (tactics_starters(t, st) < 11u) tactics_autoselect(t, g_teams[t].formation);
+        }
+    }
+
+    g_live_n = 0u;
+    g_live_cup = (kind == SLOT_CUP);
+    if (kind == SLOT_LEAGUE) {
+        u8 d, k, h, a;
+        for (d = 0u; d < DIVISIONS; d++)
+            for (k = 0u; k < 4u; k++) {
+                league_pair(idx, k, &h, &a);
+                match_setup(g_live_n++, g_div_team[d][h], g_div_team[d][a], 1u);
+            }
+    } else {
+        u8 leg = CUP_LEG_OF(idx);
+        for (i = 0u; i < g_cup_n; i++) {
+            CupTie *c = &g_cup[i];
+            if (leg == 0u) match_setup(g_live_n++, c->a, c->b, 0u);
+            else           match_setup(g_live_n++, c->b, c->a, 0u);
+        }
+    }
+    for (i = 0u; i < g_live_n; i++)
+        g_live[i].spectators = economy_attendance(g_live[i].home, g_live[i].away);
+}
+
+u8 season_cup_tied(u8 i) {
+    CupTie *c = &g_cup[i];
+    LiveGame *g = &g_live[i];
+    /* 2a mao: b em casa */
+    u8 agg_a = (u8)(c->ga1 + g->ag), agg_b = (u8)(c->gb1 + g->hg);
+    return agg_a == agg_b;
+}
+
+static void apply_league(LiveGame *g) {
+    Team *h = &g_teams[g->home], *a = &g_teams[g->away];
+    u8 d = h->div;
+    h->hgf = (u8)(h->hgf + g->hg); h->hga = (u8)(h->hga + g->ag);
+    a->agf = (u8)(a->agf + g->ag); a->aga = (u8)(a->aga + g->hg);
+    if (g->hg > g->ag)      { h->hw++; a->al++; }
+    else if (g->hg < g->ag) { h->hl++; a->aw++; }
+    else                    { h->hd++; a->ad++; }
+    g_res[d][data_div_slot(g->home)][data_div_slot(g->away)] =
+        (u8)(((g->hg > 15u ? 15u : g->hg) << 4) | (g->ag > 15u ? 15u : g->ag));
+}
+
+static void cup_resolve(void) {
+    u8 i, phase = g_cup_phase;
+    for (i = 0u; i < g_cup_n; i++) {
+        CupTie *c = &g_cup[i];
+        u8 loser;
+        if (c->winner == TEAM_NONE) {
+            u8 aa = (u8)(c->ga1 + c->ga2), ab = (u8)(c->gb1 + c->gb2);
+            c->winner = (aa >= ab) ? c->a : c->b;
+        }
+        loser = (c->winner == c->a) ? c->b : c->a;
+        g_teams[loser].cup_alive = 0u;
+        g_teams[loser].cup_reach = phase;
+        if (g_teams[c->winner].cup_reach < (u8)(phase + 1u))
+            g_teams[c->winner].cup_reach = (u8)(phase + 1u);
+    }
+    if (phase >= (u8)(CUP_PHASES - 1u)) {
+        g_cup_winner = g_cup[0].winner;
+        g_teams[g_cup_winner].cup_reach = 5u;
+        g_cup_phase = CUP_PHASES;
+    } else {
+        g_cup_phase++;
+        cup_draw();
     }
 }
 
-/* ------------------------------------------------------------------ */
-/* season_run()                                                        */
-/* ------------------------------------------------------------------ */
-
-void season_run(void) {
-    u8 round, total_rounds, div, d;
-    LeagueRound lr;
-
-    data_reset_season_stats();
-
-    div          = g_teams[g_player_team_idx].division;
-    total_rounds = league_total_rounds(div);
-
-    for (round = 1u; round <= total_rounds; round++) {
-        g_round = round;
-        render_status_bar();
-
-        /* Menu pr?-jornada                                           */
-        pre_round_menu();
-
-        /* Limpa buffer de resultados para esta jornada               */
-        g_results_count = 0u;
-
-        /* Simula todas as divis?es (sem vsync)                       */
-        for (d = 0u; d < 2u; d++) {
-            u8 cur_div    = (d == 0u) ? div : (u8)(1u - div);
-            u8 cur_rounds = league_total_rounds(cur_div);
-            u8 cur_round  = (round <= cur_rounds) ? round : cur_rounds;
-            league_build_round(cur_div, cur_round, &lr);
-            league_simulate_round(&lr);
-        }
-
-        /* Tick do boost de treinador                                 */
-        coaches_tick_boost();
-
-        /* Copa: intercalada com o campeonato.
-         * Jornada 1: sorteio
-         * Jornadas impares >= 3: 1a mao de uma fase
-         * Jornadas pares  >= 4: 2a mao + avanco de fase              */
-        if (round == 1u) {
-            cup_draw();
-        } else if (round >= 3u && (round & 1u) == 1u) {
-            cup_simulate_leg(0u);
-        } else if (round >= 4u && (round & 1u) == 0u) {
-            cup_simulate_leg(1u);
-            {
-                u8 champion = cup_advance();
-                if (champion != 0xFFu) {
-                    /* Guarda campeao da taca no palmares             */
-                    g_palmares[0].cup_champion = champion;
+void season_apply_results(void) {
+    u8 i;
+    u8 kind = season_slot_kind(g_slot), idx = season_slot_index(g_slot);
+    for (i = 0u; i < g_live_n; i++) {
+        LiveGame *g = &g_live[i];
+        economy_home_revenue(g, kind);
+        if (kind == SLOT_LEAGUE) {
+            apply_league(g);
+        } else {
+            CupTie *c = &g_cup[i];
+            if (CUP_LEG_OF(idx) == 0u) { c->ga1 = g->hg; c->gb1 = g->ag; }
+            else {
+                c->gb2 = g->hg; c->ga2 = g->ag;
+                c->extra = g->extra;
+                if (g->pens) {
+                    c->pb = g->ph; c->pa = g->pa;
+                    c->winner = (g->ph > g->pa) ? c->b : c->a;
                 }
             }
         }
-
-        /* Sal?rios a cada 4 jornadas                                 */
-        if ((round % 4u) == 0u) {
-            economy_pay_monthly_salaries();
-        }
-
-        /* Exibe resultados                                           */
-        show_results(div, round);
+        economy_socios_after(g);
     }
-
-    /* Sal?rio final se necess?rio                                    */
-    if ((total_rounds % 4u) != 0u) {
-        economy_pay_monthly_salaries();
-    }
+    if (kind == SLOT_CUP && CUP_LEG_OF(idx) == 1u) cup_resolve();
 }
 
-/* ------------------------------------------------------------------ */
-/* screen_season_end()                                                 */
-/* ------------------------------------------------------------------ */
-
-void screen_season_end(void) {
-    u8  order[TEAM_COUNT], d1order[TEAM_COUNT];
-    u8  count, d1count;
-    u8  player_pos = 0u, i;
-    u16 row;
-
-    data_sort_standings(g_division, order, &count);
-    for (i = 0u; i < count; i++) {
-        if (order[i] == g_player_team_idx) { player_pos = (u8)(i+1u); break; }
+void season_end_slot(void) {
+    u8 t;
+    u16 p;
+    for (t = 0u; t < (u8)TEAM_COUNT; t++) {
+        economy_pay_salaries(t);
+        economy_stands_tick(t);
+        if (g_teams[t].boost) g_teams[t].boost--;
+        if (!data_is_human(t)) economy_ai_finances(t);
     }
+    /* Forma: a forca varia +-3 a volta da base (observado no original) */
+    for (p = 0u; p < PLAYER_COUNT; p++) {
+        Player *pl = &g_players[p];
+        s16 v = (s16)pl->base + (s16)rng_range(7u) - 3;
+        if (v < 1) v = 1;
+        if (v > 99) v = 99;
+        pl->str = (u8)v;
+        pl->flags &= (u8)~PF_SUBBED;
+    }
+    g_slot++;
+}
 
+void season_close(void) {
+    history_compute_awards();
     economy_pay_prizes();
-    g_money = g_teams[g_player_team_idx].money;
+    history_record_season();
+}
 
-    /* Palmares                                                       */
-    for (i = (u8)(PALMARES_COUNT-1u); i > 0u; i--)
-        g_palmares[i] = g_palmares[i-1u];
-    data_sort_standings(0u, d1order, &d1count);
-    g_palmares[0].season_num    = g_season_num;
-    g_palmares[0].div1_champion = (d1count > 0u) ? d1order[0] : 0u;
-    g_palmares[0].cup_champion  = 0u;
-    g_palmares[0].player_div    = g_division;
-    g_palmares[0].player_pos    = player_pos;
-
-    /* Promo??o / rebaixamento                                        */
-    {
-        u8 old_div = g_division;
-        data_assign_divisions();
-        g_division = g_teams[g_player_team_idx].division;
-
-        render_clear_content();
-        row = (u16)CONTENT_ROW_FIRST;
-        render_textf(BG_A, 2u, row++, PAL_MAIN,
-                     "=== FIM DA TEMPORADA %u ===", (u16)g_season_num);
-        row++;
-        render_textf(BG_A, 2u, row++, PAL_MAIN,
-                     "Equipa : %-16s", g_teams[g_player_team_idx].name);
-        render_textf(BG_A, 2u, row++, PAL_MAIN,
-                     "Posicao: %u de %u", (u16)player_pos, (u16)count);
-        render_textf(BG_A, 2u, row++, PAL_MAIN,
-                     "Dinheiro: %ld esc.", g_money);
-        row++;
-
-        if (g_division < old_div)
-            render_text(BG_A, "** PROMOVIDO! **", 2u, row++, PAL_MAIN);
-        else if (g_division > old_div)
-            render_text(BG_A, "** REBAIXADO **",  2u, row++, PAL_MAIN);
-        else
-            render_text(BG_A, "Permanece na mesma divisao.", 2u, row++, PAL_MAIN);
-
-        row++;
-        if (d1count > 0u)
-            render_textf(BG_A, 2u, row++, PAL_MAIN,
-                         "Campeao Div1: %s", g_teams[d1order[0]].name);
-    }
-
-    render_help_bar("[A] Nova Temporada  [Start] Gravar", NULL);
-
-    for (;;) {
-        SYS_doVBlankProcess();
-        input_update();
-        if (input_pressed(BTN_START)) {
-            sram_save(0u);
-            render_text(BG_A, "Gravado!", 2u, (u16)CONTENT_ROW_LAST, PAL_MAIN);
+void season_promote(void) {
+    u8 d, i, order[DIVISIONS][TEAMS_PER_DIV];
+    u16 p;
+    for (d = 0u; d < DIVISIONS; d++) data_sort_div(d, order[d]);
+    for (d = 0u; d + 1u < DIVISIONS; d++)
+        for (i = 0u; i < PROMOTED; i++) {
+            g_teams[order[d][TEAMS_PER_DIV - 1u - i]].div = (u8)(d + 1u);
+            g_teams[order[d + 1u][i]].div = d;
         }
-        if (input_pressed(BTN_CONFIRM)) break;
+    /* Evolucao das forcas de base no defeso */
+    for (p = 0u; p < PLAYER_COUNT; p++) {
+        Player *pl = &g_players[p];
+        s16 v = (s16)pl->base + (s16)rng_range(5u) - 2;
+        if (v < 1) v = 1;
+        if (v > 60) v = 60;
+        pl->base = (u8)v;
+        pl->str = pl->base;
     }
-
-    g_season_num++;
-    g_round    = 1u;
-    g_division = g_teams[g_player_team_idx].division;
+    if (g_season < 250u) g_season++;
+    season_start();
 }

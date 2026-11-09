@@ -25,8 +25,8 @@ teams.bin
 
   Per team (54 bytes × team_count):
     char[20]  name             — NUL-terminated, ASCII transliterated, max 19 chars
-    uint8_t   n1               — copa pot / seeding value
-    uint8_t   n2               — budget/strength factor
+    uint8_t   n1               — cor CGA do texto (fg)
+    uint8_t   n2               — cor CGA do fundo (bg)
     uint8_t   nac[3]           — 3-char nationality code (e.g. "POR"), no NUL
     uint8_t   _pad             — padding to align players array to even offset
 
@@ -60,7 +60,7 @@ import unicodedata
 # Constants — must match game/types.h exactly
 # ---------------------------------------------------------------------------
 
-TEAM_COUNT         = 29
+TEAM_COUNT         = 32   # o jogo original usa as 32 primeiras equipas do ficheiro
 PLAYERS_PER_TEAM   = 16
 COACH_COUNT        = 50
 
@@ -187,7 +187,15 @@ def parse_equipas(path: str) -> list[dict]:
     # contain CP850 box-drawing characters used as actual box-drawing (0xDA etc.).
     # Since we transliterate everything to ASCII anyway, either decoding is fine
     # as long as the transliteration table covers the differences.
-    lines = raw_bytes.decode('latin-1').replace('\r\n', '\n').split('\n')
+    # Ficheiro misto: bytes 0x80-0xBF sao CP850 (0xA1 = i, 0xA3 = u) e
+    # 0xC0-0xFF sao Latin-1 (0xE9 = e). Decodifica byte a byte.
+    def _dec(b: int) -> str:
+        if b < 0x80:
+            return chr(b)
+        if b < 0xC0 or b == 0xC6:   # 0xC6 = a til em CP850 (Ronaldao)
+            return bytes([b]).decode('cp850')
+        return bytes([b]).decode('latin-1')
+    lines = ''.join(_dec(b) for b in raw_bytes).replace('\r\n', '\n').split('\n')
 
     teams = []
     i = 0
@@ -197,7 +205,8 @@ def parse_equipas(path: str) -> list[dict]:
 
         # --- Team header detection ---
         # Format: ' NAME...   NAC'  (leading space, trailing 3-letter code)
-        hm = re.match(r'^[ ](.+?)\s+([A-Z]{3})\s*$', line)
+        # O codigo de 3 letras pode vir colado ao nome ('INTERNACIONALPOR').
+        hm = re.match(r'^ ?(\S.+?)\s*([A-Z]{3})\s*$', line)
         if not hm:
             i += 1
             continue
@@ -214,8 +223,8 @@ def parse_equipas(path: str) -> list[dict]:
 
         team_name_raw = hm.group(1).strip()
         team_nac      = hm.group(2)[:3]
-        n1            = int(n1_str)
-        n2            = int(n2_str)
+        n1            = int(n1_str)   # cor CGA do texto do clube
+        n2            = int(n2_str)   # cor CGA do fundo do clube
         team_name     = transliterate(team_name_raw)
 
         if len(team_name) > TEAM_NAME_LEN - 1:
@@ -508,8 +517,9 @@ def main() -> int:
     coaches = parse_treinad(treinad_path)
 
     # --- Validate counts ---
-    if len(teams) != TEAM_COUNT:
+    if len(teams) < TEAM_COUNT:
         warn(f'Expected {TEAM_COUNT} teams, got {len(teams)}')
+    teams = teams[:TEAM_COUNT]
     if len(coaches) != COACH_COUNT:
         warn(f'Expected {COACH_COUNT} coaches, got {len(coaches)}')
 

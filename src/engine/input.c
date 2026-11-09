@@ -70,6 +70,12 @@ void input_update(void) {
 
     s_prev_state = s_curr_state;
     s_curr_state = JOY_readJoypad(JOY_1);
+    {
+        /* Modo de teste (ELF_AUTOPLAY): carrega em A frame sim, frame nao. */
+        extern u8 g_autoplay;
+        static u8 s_tick;
+        if (g_autoplay) s_curr_state = (u16)((++s_tick & 1u) ? BUTTON_A : 0u);
+    }
 
     /* Atualiza contadores de hold para cada bit de bot?o.             */
     for (i = 0u; i < HELD_ARRAY_SIZE; i++) {

@@ -1,3 +1,8 @@
+> **Atenção (nov. 2026):** várias conclusões deste documento estavam erradas — 29 equipas e 2 divisões
+> (são 32 em 4 divisões de 8), N1/N2 como pote/orçamento (são as cores do clube), formações,
+> vitória a 3 pontos (são 2), "TREINADORES EM JOGO" (são os treinadores humanos), o leilão de ordenado,
+> entre outras. Ver `original_observado.md`, feito a correr o executável original.
+
 # Elifoot II — Análise Comportamental Detalhada
 ### Referência para Port para Sega Genesis (SGDK 1.70)
 

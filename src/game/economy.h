@@ -3,31 +3,28 @@
 
 #include <genesis.h>
 #include "types.h"
+#include "match.h"
 
-/* Sal?rio m?nimo que um jogador de for?a 'strength' aceita.          */
-long economy_min_salary(u8 strength);
+/* Premios (Ctrl+F3 no original, valores observados) */
+#define PRIZE_FIRST   0u
+#define PRIZE_SECOND  1u
+#define PRIZE_THIRD   2u
+#define PRIZE_CUP     3u
+#define PRIZE_ATTACK  4u
+#define PRIZE_DEFENCE 5u
+#define PRIZE_SCORER  6u
+long economy_prize(u8 kind);
+const char *economy_prize_label(u8 kind);
 
-/* Processa pedidos de aumento salarial no in?cio de cada temporada.
- * Percorre todos os jogadores da equipa team_idx. Para cada um que
- * ganha abaixo do m?nimo, pede aumento ou sai (se a equipa n?o pode
- * perder o jogador por ter poucos no plantel). Retorna n?mero de
- * jogadores que sa?ram (vendidos por 0 -- rescis?o for?ada).          */
-u8 economy_process_salary_requests(u8 team_idx);
-
-/* Receita de bilheteria para o jogo em casa da equipa home_team.     */
-long economy_ticket_revenue(u8 home_team);
-
-/* Pr?mios de classifica??o no fim da temporada.
- * Chama economy_pay_prize() para cada equipa com base na posi??o.    */
+u16  economy_attendance(u8 home, u8 away);
+/* Bilheteira do jogo para o anfitriao; regista em Ultimas Receitas. */
+void economy_home_revenue(const LiveGame *g, u8 kind);
+void economy_socios_after(const LiveGame *g);
+void economy_pay_salaries(u8 t);
+void economy_stands_tick(u8 t);
+void economy_ai_finances(u8 t);
 void economy_pay_prizes(void);
+/* Constroi uma bancada (100000). 1 se conseguiu. */
+u8   economy_build_stand(u8 t);
 
-/* Paga sal?rios mensais de todos os jogadores de todas as equipas.
- * Chamada uma vez por jornada. Desconta de team->money.
- * Se money < 0 depois do pagamento, a equipa fica em d?vida.        */
-void economy_pay_monthly_salaries(void);
-
-/* Retorna TRUE se a equipa team_idx tem dinheiro suficiente para
- * pagar os sal?rios deste m?s sem ficar negativa.                    */
-u8 economy_can_pay_salaries(u8 team_idx);
-
-#endif /* ELIFOOT_ECONOMY_H */
+#endif

@@ -1,127 +1,85 @@
 #ifndef ELIFOOT_DATA_H
 #define ELIFOOT_DATA_H
 
-/*
- * game/data.h -- Arrays globais de estado do jogo e fun??es de carga
- *
- * data_init() l? os bin?rios de ROM (teams_data, coaches_data gerados
- * pelo rescomp a partir de teams.bin / coaches.bin) e preenche os
- * arrays g_players[], g_teams[], g_coaches[] em RAM.
- *
- * Or?amento de RAM:
- *   g_players:  464 ? sizeof(Player)    ? 13 KB
- *   g_teams:     29 ? sizeof(Team)      ?  2 KB
- *   g_coaches:   50 ? 20 bytes          ?  1 KB
- *   g_results:  200 ? sizeof(MatchResult) ? 1.2 KB
- *   g_cup_ties:  16 ? sizeof(CupTie)   ?  128 bytes
- *   Total estimado: ~17 KB de 64 KB dispon?veis
- */
-
 #include <genesis.h>
 #include "types.h"
 
-/* ------------------------------------------------------------------ */
-/* Arrays globais em RAM                                               */
-/* ------------------------------------------------------------------ */
+/* ---- Estado global ------------------------------------------------- */
+extern Player  g_players[PLAYER_COUNT];
+extern Team    g_teams[TEAM_COUNT];
+extern char    g_coaches[COACH_COUNT][COACH_NAME_LEN];
+extern Manager g_mgr[MAX_MANAGERS];
+extern u8      g_mgr_count;
+extern u8      g_cur_mgr;          /* treinador humano a jogar agora   */
 
-extern Player      g_players[TEAM_COUNT * PLAYERS_PER_TEAM];
-extern Team        g_teams[TEAM_COUNT];
-extern char        g_coaches[COACH_COUNT][COACH_NAME_LEN];
-extern MatchResult g_results[200];
-extern CupTie      g_cup_ties[16];
-extern SeasonRecord g_palmares[PALMARES_COUNT];
+extern u8      g_season;           /* epoca (1..)                     */
+extern u8      g_slot;             /* jornada da epoca (0..23)        */
 
-/* ------------------------------------------------------------------ */
-/* Estado de temporada global                                          */
-/* ------------------------------------------------------------------ */
+/* Equipas de cada divisao (ordem fixa na epoca, usada no calendario). */
+extern u8      g_div_team[DIVISIONS][TEAMS_PER_DIV];
+/* Resultados [div][casa][fora] = golos casa<<4 | golos fora, 0xFF = por jogar.
+ * Indices = posicao em g_div_team. */
+extern u8      g_res[DIVISIONS][TEAMS_PER_DIV][TEAMS_PER_DIV];
 
-/* Estas vari?veis s?o declaradas extern em main.c e usadas em        */
-/* render_status_bar(). Definidas aqui para centralizar o estado.     */
-extern u8   g_season_num;        /* n?mero da temporada atual (1-99)  */
-extern u8   g_round;             /* jornada atual (1-N)               */
-extern u8   g_player_team_idx;   /* ?ndice da equipe do jogador        */
-extern u8   g_division;          /* divis?o da equipe do jogador       */
-extern long g_money;             /* dinheiro da equipe do jogador      */
+/* Taca */
+extern CupTie  g_cup[16];
+extern u8      g_cup_n;            /* confrontos da fase actual       */
+extern u8      g_cup_phase;        /* 0..4, 5 = acabou                */
+extern u8      g_cup_winner;
 
-/* N?mero de resultados armazenados em g_results[] esta rodada.       */
-extern u8   g_results_count;
-
-/* Historico de transferencias (ultimas 20) */
+/* Historico de transferencias (Ctrl+F4) */
 typedef struct {
-    char name[16];    /* nome do jogador */
-    u8   pos;         /* posicao */
-    u8   strength;    /* forca */
-    u8   from_team;   /* equipa origem */
-    u8   to_team;     /* equipa destino */
-    long salary;      /* novo ordenado */
-} TransferRecord;
+    u16 player;
+    u8  from, to;
+    u8  str, _pad;
+    u16 salary;
+} TransferRec;
+#define TRANSFER_HIST 20u
+extern TransferRec g_transfers[TRANSFER_HIST];
+extern u8          g_transfer_n;
 
-#define TRANSFER_HISTORY_SIZE 20u
-extern TransferRecord g_transfer_history[TRANSFER_HISTORY_SIZE];
-extern u8             g_transfer_count;
-void data_record_transfer(const char *name, u8 pos, u8 strength,
-                          u8 from_t, u8 to_t, long salary);
+/* Ultimas receitas (Ctrl+F5) por equipa humana: [mgr][0=camp,1=taca] */
+typedef struct {
+    u8   opp, gh, ga, _pad;
+    u16  tickets, spectators;
+    long revenue;
+} RevenueRec;
+#define REVENUE_HIST 8u
+extern RevenueRec g_rev[MAX_MANAGERS][2][REVENUE_HIST];
+extern u8         g_rev_n[MAX_MANAGERS][2];
 
-/* Gols marcados por jogador na temporada corrente.
- * Indice = indice global em g_players[]. */
-extern u16  g_goals[TEAM_COUNT * PLAYERS_PER_TEAM];
+/* ---- Funcoes ------------------------------------------------------- */
+void data_init(void);                  /* carrega ROM, estado inicial */
+void data_new_season_tables(void);     /* zera estatisticas e g_res    */
 
-/* N?mero de confrontos de copa activos em g_cup_ties[].              */
-extern u8   g_cup_ties_count;
+/* Lista o plantel de t (ordenado por posicao). Devolve o numero. */
+u8   data_squad(u8 t, u16 *out, u8 max);
+u8   data_squad_count(u8 t);
+/* Chamar sempre que um jogador muda de clube (invalida a cache). */
+void data_rosters_changed(void);
+u8   data_gk_count(u8 t);
 
-/* Fase actual da copa (0=eliminat?rias, 1=quartos, 2=meias, 3=final).*/
-extern u8   g_cup_phase;
+/* Classificacao da divisao: out[8] indices de equipa, do 1o ao ultimo. */
+void data_sort_div(u8 div, u8 *out);
+u8   data_team_place(u8 t);            /* 1..8 */
+u8   data_div_slot(u8 t);              /* indice de t em g_div_team    */
 
-/* ------------------------------------------------------------------ */
-/* API p?blica                                                         */
-/* ------------------------------------------------------------------ */
+/* Treinador humano de t ou 0xFF */
+u8   data_team_mgr(u8 t);
+u8   data_is_human(u8 t);
 
-/*
- * data_init() -- Carrega dados de ROM para RAM e inicializa estado.
- * Deve ser chamado ap?s render_init() e rng_init(), antes de qualquer
- * fun??o de jogo ou tela.
- *
- * Responsabilidades:
- *   1. L? teams_data[] (ROM) -> g_teams[] e g_players[] (RAM).
- *   2. L? coaches_data[] (ROM) -> g_coaches[] (RAM).
- *   3. Calcula strength inicial de cada jogador (baseado em n2 da equipe).
- *   4. Calcula salary inicial de cada jogador.
- *   5. Atribui forma??o padr?o (4-4-2) a todas as equipes.
- *   6. Inicializa estado de temporada (g_season_num=1, g_round=0).
- */
-void data_init(void);
+/* Valores de mercado (observados: preco ~ forca*3000, minimo ~ forca*70) */
+long data_price(u16 p);
+u16  data_min_salary(u16 p);
 
-/*
- * data_assign_division() -- Distribui as 29 equipes nas divis?es com
- * base nos valores n1/n2 e no estado actual de promo??o/rebaixamento.
- * Chamado no in?cio de cada temporada por season_run().
- */
-void data_assign_divisions(void);
+long data_total_salaries(u8 t);
+u16  data_capacity(u8 t);
 
-/*
- * data_reset_season_stats() -- Zera wins/draws/losses/goals de todas
- * as equipes. Chamado no in?cio de cada temporada.
- */
-void data_reset_season_stats(void);
+void data_record_transfer(u16 p, u8 from, u8 to);
+void data_record_revenue(u8 mgr, u8 kind, u8 opp, u8 gh, u8 ga,
+                         u16 tickets, u16 spect, long rev);
 
-/*
- * data_get_team_player_count() -- Retorna n?mero de jogadores no plantel
- * da equipe team_idx (inclui titulares e suplentes).
- */
-u8 data_get_team_player_count(u8 team_idx);
-
-/*
- * data_get_team_gk_count() -- Retorna n?mero de guarda-redes no plantel.
- * Necess?rio para validar venda de jogadores (m?nimo 1 GR).
- */
-u8 data_get_team_gk_count(u8 team_idx);
-
-/*
- * data_sort_standings() -- Ordena as equipes de uma divis?o por pontos,
- * depois saldo de gols, depois gols marcados. Resultado em out_order[]
- * (array de ?ndices em g_teams[]). div=0..3.
- * N?o chama SYS_doVBlankProcess() -- seguro para chamar em qualquer contexto.
- */
-void data_sort_standings(u8 div, u8 *out_order, u8 *out_count);
+/* Copia segura de string */
+void data_strcpy(char *dst, const char *src, u8 cap);
 
 #endif /* ELIFOOT_DATA_H */
